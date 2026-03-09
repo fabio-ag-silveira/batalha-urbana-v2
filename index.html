@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Batalha Urbana</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="hud">
+      <div class="hud-card">
+        <p class="eyebrow">Estado da partida</p>
+        <h1>Batalha Urbana</h1>
+        <p id="roundLabel" class="round-label"></p>
+        <p id="turnLabel" class="turn-label"></p>
+        <p id="statusLabel" class="status-label"></p>
+      </div>
+
+      <div class="hud-card controls-card">
+        <p class="eyebrow">Controles de partida</p>
+        <div class="control-group">
+          <p class="control-title">Modo</p>
+          <div class="button-row" id="modeButtons">
+            <button type="button" class="hud-button" data-mode="ai">Versus IA</button>
+            <button type="button" class="hud-button" data-mode="local">Versus Local</button>
+            <button type="button" class="hud-button" data-mode="lan">LAN</button>
+          </div>
+        </div>
+        <div class="control-group">
+          <p class="control-title">Dificuldade IA</p>
+          <div class="button-row" id="difficultyButtons">
+            <button type="button" class="hud-button" data-difficulty="easy">Facil</button>
+            <button type="button" class="hud-button" data-difficulty="medium">Media</button>
+            <button type="button" class="hud-button" data-difficulty="hard">Dificil</button>
+          </div>
+        </div>
+        <div class="control-group lan-group">
+          <p class="control-title">Sala LAN</p>
+          <div class="lan-fields">
+            <label class="field-label" for="serverUrlInput">Servidor</label>
+            <input id="serverUrlInput" class="hud-input" type="text" placeholder="http://192.168.0.10:8000">
+          </div>
+          <div class="button-row">
+            <button type="button" class="hud-button" id="createRoomButton">Criar sala</button>
+            <button type="button" class="hud-button" id="refreshRoomsButton">Atualizar</button>
+            <button type="button" class="hud-button" id="leaveRoomButton">Sair</button>
+          </div>
+          <div id="roomList" class="room-list"></div>
+          <p id="connectionStatus" class="note">Nao conectado</p>
+        </div>
+      </div>
+
+      <div class="hud-grid">
+        <article class="hud-card player-card player-one">
+          <p class="eyebrow">Player 1</p>
+          <div id="playerOneStats" class="stats-panel"></div>
+          <div class="shortcut-list">
+            <span class="shortcut-pill"><strong>W/S</strong> velocidade</span>
+            <span class="shortcut-pill"><strong>A/D</strong> angulo</span>
+            <span class="shortcut-pill"><strong>F</strong> atira</span>
+          </div>
+        </article>
+
+        <article class="hud-card player-card player-two">
+          <p class="eyebrow">Player 2</p>
+          <div id="playerTwoStats" class="stats-panel"></div>
+          <div class="shortcut-list">
+            <span class="shortcut-pill"><strong>I/K</strong> velocidade</span>
+            <span class="shortcut-pill"><strong>J/L</strong> angulo</span>
+            <span class="shortcut-pill"><strong>H</strong> atira</span>
+          </div>
+        </article>
+      </div>
+
+      <div class="hud-card footer-card">
+        <p class="eyebrow">Atalhos</p>
+        <div class="shortcut-list compact">
+          <span class="shortcut-pill"><strong>M</strong> troca modo</span>
+          <span class="shortcut-pill"><strong>N</strong> muda IA</span>
+          <span class="shortcut-pill"><strong>B</strong> reinicia</span>
+          <span class="shortcut-pill"><strong>Q</strong> pausa captura</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="stage-shell">
+      <canvas id="gameCanvas" width="1200" height="800" aria-label="Campo de batalha"></canvas>
+    </section>
+  </main>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
