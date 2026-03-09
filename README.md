@@ -1,6 +1,6 @@
 # Batalha Urbana
 
-Migracao do projeto original em `main.cpp` para uma versao web moderna com `HTML + CSS + JavaScript modular`.
+Migracao do projeto original em C++ para uma versao web moderna com `HTML + CSS + JavaScript modular`.
 
 ## Como executar
 
@@ -69,4 +69,4 @@ Isso isola a logica do jogo do desenho e evita que otimizacoes mudem a posicao d
 
 ## Legado
 
-[main.cpp](/c:/repos/batalha-urbana/main.cpp) foi mantido como referencia da implementacao original em GLUT/OpenGL.
+Repositorio original em C++/OpenGL: <https://github.com/fabio-ag-silveira/BatalhaUrbana_C17>
