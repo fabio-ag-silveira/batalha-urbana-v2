@@ -2,6 +2,8 @@ import { CITY_TRANSFORM, VIEW_BOUNDS } from "./config.js";
 
 const VIEW_WIDTH = VIEW_BOUNDS.maxX - VIEW_BOUNDS.minX;
 const VIEW_HEIGHT = VIEW_BOUNDS.maxY - VIEW_BOUNDS.minY;
+// Proporcao em que o enquadramento legado [-40, 40] nao distorce a cena.
+const REFERENCE_ASPECT = 1.5;
 
 export class CanvasRenderer {
   constructor(canvas) {
@@ -11,6 +13,7 @@ export class CanvasRenderer {
     this.width = 0;
     this.height = 0;
     this.pixelRatio = 1;
+    this.viewHeight = VIEW_HEIGHT;
     this.layers = new Map();
     this.resize();
   }
@@ -27,6 +30,10 @@ export class CanvasRenderer {
       this.pixelRatio = ratio;
       this.canvas.width = Math.round(width * ratio);
       this.canvas.height = Math.round(height * ratio);
+      // A largura visivel e fixa; a altura acompanha a tela, ancorada na rua,
+      // para a cena nao achatar em telas largas (ex.: celular deitado).
+      const aspect = width / height;
+      this.viewHeight = Math.min(200, Math.max(30, (VIEW_HEIGHT * REFERENCE_ASPECT) / aspect));
     }
   }
 
@@ -47,7 +54,7 @@ export class CanvasRenderer {
       ? (point.y + CITY_TRANSFORM.translateY) * CITY_TRANSFORM.scaleY
       : point.y;
     const normalizedX = (viewX - VIEW_BOUNDS.minX) / VIEW_WIDTH;
-    const normalizedY = (viewY - VIEW_BOUNDS.minY) / VIEW_HEIGHT;
+    const normalizedY = (viewY - VIEW_BOUNDS.minY) / this.viewHeight;
 
     return {
       x: normalizedX * this.width,
@@ -60,7 +67,7 @@ export class CanvasRenderer {
     const scaleY = space === "gameplay" ? CITY_TRANSFORM.scaleY : 1;
     return {
       x: (units * scaleX * this.width) / VIEW_WIDTH,
-      y: (units * scaleY * this.height) / VIEW_HEIGHT,
+      y: (units * scaleY * this.height) / this.viewHeight,
     };
   }
 

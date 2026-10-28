@@ -21,12 +21,24 @@ const ui = {
   modeButtons: Array.from(document.querySelectorAll("[data-mode]")),
   difficultyButtons: Array.from(document.querySelectorAll("[data-difficulty]")),
   soundButton: document.getElementById("soundButton"),
+  resetButton: document.getElementById("resetButton"),
+  menuButton: document.getElementById("menuButton"),
+  menuClose: document.getElementById("menuClose"),
+  hudBackdrop: document.getElementById("hudBackdrop"),
+  fullscreenButton: document.getElementById("fullscreenButton"),
+  rotateDismiss: document.getElementById("rotateDismiss"),
+  touchButtons: Array.from(document.querySelectorAll("[data-control]")),
 };
 
 const game = new Game();
 const hud = new Hud(ui);
 const effects = new Effects();
 const sound = new SoundBoard();
+
+function resetMatch() {
+  game.resetGame();
+  effects.reset();
+}
 
 const input = new InputController({
   resolveTarget(binding) {
@@ -37,8 +49,7 @@ const input = new InputController({
   },
   onShortcut(key) {
     if (key === "b") {
-      game.resetGame();
-      effects.reset();
+      resetMatch();
     } else if (key === "u") {
       sound.toggle();
     } else if (key === "m") {
@@ -74,6 +85,61 @@ ui.soundButton.addEventListener("click", () => {
   ui.soundButton.blur();
 });
 
+ui.resetButton.addEventListener("click", () => {
+  resetMatch();
+  setMenuOpen(false);
+  ui.resetButton.blur();
+});
+
+// Botoes de toque: segurar = tecla apertada; usam o mesmo caminho do teclado.
+ui.touchButtons.forEach((button) => {
+  const id = `touch:${button.dataset.control}`;
+  const release = (options) => {
+    button.classList.remove("is-pressed");
+    input.release(id, options);
+  };
+  button.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    button.setPointerCapture(event.pointerId);
+    button.classList.add("is-pressed");
+    sound.unlock();
+    input.press(id, { player: "current", control: button.dataset.control });
+  });
+  button.addEventListener("pointerup", () => release());
+  button.addEventListener("pointercancel", () => release({ cancel: true }));
+  button.addEventListener("lostpointercapture", () => release());
+  button.addEventListener("contextmenu", (event) => event.preventDefault());
+});
+
+window.addEventListener("touchstart", () => document.body.classList.add("touch"), { once: true, passive: true });
+
+function setMenuOpen(open) {
+  document.body.classList.toggle("menu-open", open);
+}
+
+ui.menuButton.addEventListener("click", () => setMenuOpen(true));
+ui.menuClose.addEventListener("click", () => setMenuOpen(false));
+ui.hudBackdrop.addEventListener("click", () => setMenuOpen(false));
+ui.rotateDismiss.addEventListener("click", () => document.body.classList.add("rotate-dismissed"));
+
+if (document.fullscreenEnabled) {
+  ui.fullscreenButton.hidden = false;
+  ui.fullscreenButton.addEventListener("click", async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+      await document.documentElement.requestFullscreen({ navigationUI: "hide" });
+      // Navegadores que suportam travam na horizontal; os demais ignoram.
+      await screen.orientation?.lock?.("landscape").catch(() => {});
+    } catch {
+      // tela cheia recusada pelo navegador
+    }
+    ui.fullscreenButton.blur();
+  });
+}
+
 let lastEventId = 0;
 let lastTickSecond = null;
 
@@ -82,6 +148,9 @@ function consumeEvents(state) {
     if (event.id > lastEventId) {
       effects.handleEvent(event, state, sound);
       lastEventId = event.id;
+      if (event.type === "explosion" && document.body.classList.contains("touch")) {
+        navigator.vibrate?.(35);
+      }
     }
   });
 }

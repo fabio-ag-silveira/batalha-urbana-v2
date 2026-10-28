@@ -40,6 +40,12 @@ Cada jogador começa a rodada com 100 HP. Vence a rodada quem destruir o carrinh
 - **Timer:** 20 s por turno. Se acabar durante a carga, o tiro sai com a força atual; senão, a vez passa.
 - **Atalhos:** `B` reinicia, `M` alterna IA/local, `N` muda a dificuldade da IA, `U` liga/desliga o som.
 
+### No celular ou tablet
+
+- Jogue com o aparelho **na horizontal**. Na vertical aparece um aviso, que pode ser dispensado.
+- Os botões na parte de baixo da tela fazem o mesmo que o teclado: ◀ ▶ movem, ▲ ▼ giram o canhão, e **ATIRAR** funciona segurando para carregar e soltando para disparar.
+- O botão ☰ abre o menu (modo, dificuldade, som e nova partida), e ⛶ ativa a tela cheia nos navegadores que suportam.
+
 ## Estrutura
 
 - [src/game.js](/c:/repos/batalha-urbana/src/game.js): estado da partida, fases do turno, entrada, dano, quedas e IA.

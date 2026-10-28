@@ -1,4 +1,4 @@
-// "current" significa o jogador da vez (setas + espaco para quem joga sozinho ou em LAN).
+// "current" significa o jogador da vez (setas, espaco e botoes de toque).
 const KEY_BINDINGS = {
   w: { player: 1, control: "up" },
   s: { player: 1, control: "down" },
@@ -59,31 +59,40 @@ export class InputController {
       this.onShortcut(key);
       return;
     }
-    if (!binding || this.held.has(key)) {
+    if (binding) {
+      this.press(key, binding);
+    }
+  }
+
+  handleKeyUp(event) {
+    this.release(event.key.toLowerCase());
+  }
+
+  // Usado pelo teclado e pelos botoes de toque: "id" identifica a origem
+  // (tecla ou botao) para que a soltura encontre o aperto correspondente.
+  press(id, binding) {
+    if (this.held.has(id)) {
       return;
     }
-
     const target = this.resolveTarget(binding);
     if (target === null) {
       return;
     }
-    this.held.set(key, { target, control: binding.control });
+    this.held.set(id, { target, control: binding.control });
     this.dispatch(target, binding.control, true);
   }
 
-  handleKeyUp(event) {
-    const key = event.key.toLowerCase();
-    const entry = this.held.get(key);
+  release(id, options) {
+    const entry = this.held.get(id);
     if (!entry) {
       return;
     }
-    this.held.delete(key);
-    this.dispatch(entry.target, entry.control, false);
+    this.held.delete(id);
+    this.dispatch(entry.target, entry.control, false, options);
   }
 
   // Ao perder o foco a carga e cancelada em vez de disparar.
   releaseAll() {
-    this.held.forEach((entry) => this.dispatch(entry.target, entry.control, false, { cancel: true }));
-    this.held.clear();
+    [...this.held.keys()].forEach((id) => this.release(id, { cancel: true }));
   }
 }

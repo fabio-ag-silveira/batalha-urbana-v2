@@ -2,14 +2,19 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#020304">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Batalha Urbana</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <main class="app-shell">
-    <section class="hud">
+    <section class="hud" id="hud" aria-label="Menu da partida">
       <div class="hud-card">
+        <button type="button" class="hud-button hud-close" id="menuClose">Fechar</button>
         <p class="eyebrow">Estado da partida</p>
         <h1>Batalha Urbana</h1>
         <p id="roundLabel" class="round-label"></p>
@@ -32,6 +37,12 @@
             <button type="button" class="hud-button" data-difficulty="easy">Fácil</button>
             <button type="button" class="hud-button" data-difficulty="medium">Média</button>
             <button type="button" class="hud-button" data-difficulty="hard">Difícil</button>
+          </div>
+        </div>
+        <div class="control-group">
+          <p class="control-title">Partida</p>
+          <div class="button-row">
+            <button type="button" class="hud-button" id="resetButton">Nova partida</button>
             <button type="button" class="hud-button" id="soundButton">Som: ligado</button>
           </div>
         </div>
@@ -73,8 +84,31 @@
 
     <section class="stage-shell">
       <canvas id="gameCanvas" width="1200" height="800" aria-label="Campo de batalha"></canvas>
+      <button type="button" class="stage-button menu-button" id="menuButton" aria-label="Abrir menu">☰</button>
+      <button type="button" class="stage-button fullscreen-button" id="fullscreenButton" aria-label="Tela cheia" hidden>⛶</button>
+
+      <div class="touch-controls" id="touchControls">
+        <div class="touch-group">
+          <button type="button" class="touch-button" data-control="left" aria-label="Mover para a esquerda">◀</button>
+          <button type="button" class="touch-button" data-control="right" aria-label="Mover para a direita">▶</button>
+        </div>
+        <div class="touch-group">
+          <button type="button" class="touch-button" data-control="up" aria-label="Levantar o canhão">▲</button>
+          <button type="button" class="touch-button" data-control="down" aria-label="Abaixar o canhão">▼</button>
+          <button type="button" class="touch-button touch-fire" data-control="fire" aria-label="Atirar: segure para carregar e solte">
+            ATIRAR<small>segure e solte</small>
+          </button>
+        </div>
+      </div>
+
+      <div class="rotate-hint" id="rotateHint">
+        <div class="rotate-phone" aria-hidden="true"></div>
+        <p>Gire o celular para jogar na horizontal</p>
+        <button type="button" class="hud-button" id="rotateDismiss">Jogar assim mesmo</button>
+      </div>
     </section>
   </main>
+  <div class="hud-backdrop" id="hudBackdrop"></div>
 
   <script type="module" src="./src/main.js"></script>
 </body>

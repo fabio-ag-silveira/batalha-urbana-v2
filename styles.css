@@ -313,6 +313,8 @@ h1 {
 
 .stage-shell {
   position: relative;
+  display: flex;
+  flex-direction: column;
   background: #0b0e16;
   min-height: 0;
   height: calc(100vh - 28px);
@@ -323,24 +325,213 @@ h1 {
 
 canvas {
   display: block;
+  flex: 1 1 auto;
   width: 100%;
-  height: 100%;
   min-height: 0;
+  touch-action: none;
 }
 
-@media (max-width: 980px) {
+.stage-button {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  z-index: 5;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(10, 12, 18, 0.62);
+  color: var(--text);
+  font-size: 1.15rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.stage-button[hidden] {
+  display: none;
+}
+
+.menu-button {
+  display: none;
+  left: max(10px, env(safe-area-inset-left));
+}
+
+.fullscreen-button {
+  right: max(10px, env(safe-area-inset-right));
+}
+
+.hud-close {
+  display: none;
+  float: right;
+}
+
+.hud-backdrop {
+  display: none;
+}
+
+.touch-controls {
+  display: none;
+  flex: 0 0 auto;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px max(14px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  background: #0b0e16;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+body.touch .touch-controls {
+  display: flex;
+}
+
+.touch-group {
+  display: flex;
+  gap: 10px;
+}
+
+.touch-button {
+  width: 64px;
+  height: 56px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: #232731;
+  color: var(--text);
+  font: inherit;
+  font-size: 1.3rem;
+  font-weight: 800;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 80ms ease, background 80ms ease;
+}
+
+.touch-button.is-pressed {
+  background: #f0f0f2;
+  color: #181a20;
+  transform: scale(0.95);
+}
+
+.touch-fire {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 124px;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: linear-gradient(180deg, #ef4444, #b91c1c);
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+}
+
+.touch-fire.is-pressed {
+  background: linear-gradient(180deg, #fca5a5, #ef4444);
+  color: #ffffff;
+}
+
+.touch-fire small {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  opacity: 0.85;
+}
+
+.rotate-hint {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px;
+  text-align: center;
+  background: rgba(2, 3, 4, 0.92);
+}
+
+.rotate-hint p {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.rotate-phone {
+  width: 46px;
+  height: 78px;
+  border: 4px solid var(--text);
+  border-radius: 10px;
+  animation: rotate-phone 2.2s ease-in-out infinite;
+}
+
+@keyframes rotate-phone {
+  0%, 20% { transform: rotate(0deg); }
+  50%, 80% { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@media (pointer: coarse) {
+  .touch-controls {
+    display: flex;
+  }
+
+  .shortcut-list,
+  .footer-card {
+    display: none;
+  }
+}
+
+@media (pointer: coarse) and (orientation: portrait) {
+  body:not(.rotate-dismissed) .rotate-hint {
+    display: flex;
+  }
+}
+
+@media (max-width: 980px), (pointer: coarse) {
   body {
-    overflow: auto;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   .app-shell {
-    grid-template-columns: 1fr;
-    height: auto;
+    display: block;
+    height: 100vh;
+    height: 100dvh;
+    padding: 0;
+  }
+
+  .stage-shell {
+    height: 100%;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .menu-button,
+  .hud-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .hud {
-    grid-template-rows: auto;
-    overflow: visible;
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 20;
+    width: min(360px, 88vw);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    padding-left: max(12px, env(safe-area-inset-left));
+    overflow-y: auto;
+    background: rgba(2, 3, 4, 0.97);
+    transform: translateX(-105%);
+    transition: transform 220ms ease;
+  }
+
+  body.menu-open .hud {
+    transform: none;
   }
 
   .hud-card.controls-card {
@@ -348,11 +539,34 @@ canvas {
     overflow: visible;
   }
 
-  .stage-shell {
-    height: 58vh;
+  .hud-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 220ms ease;
   }
 
-  .stats-panel {
-    grid-template-columns: 1fr;
+  body.menu-open .hud-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (max-height: 420px) {
+  .touch-controls {
+    padding-top: 6px;
+  }
+
+  .touch-button {
+    width: 56px;
+    height: 46px;
+  }
+
+  .touch-fire {
+    width: 112px;
   }
 }
