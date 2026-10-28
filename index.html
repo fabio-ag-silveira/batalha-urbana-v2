@@ -88,18 +88,18 @@
 
     <section class="stage-shell">
       <canvas id="gameCanvas" width="1200" height="800" aria-label="Campo de batalha"></canvas>
-      <button type="button" class="stage-button menu-button" id="menuButton" aria-label="Abrir menu">☰</button>
-      <button type="button" class="stage-button fullscreen-button" id="fullscreenButton" aria-label="Tela cheia" hidden>⛶</button>
+      <button type="button" class="stage-button menu-button" id="menuButton" aria-label="Abrir menu"><svg class="stage-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <button type="button" class="stage-button fullscreen-button" id="fullscreenButton" aria-label="Tela cheia" hidden><svg class="stage-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/></svg></button>
 
       <div class="touch-controls" id="touchControls">
         <div class="touch-group">
-          <button type="button" class="touch-button" data-control="left" aria-label="Mover para a esquerda">◀</button>
-          <button type="button" class="touch-button" data-control="right" aria-label="Mover para a direita">▶</button>
+          <button type="button" class="touch-button" data-control="left" aria-label="Mover para a esquerda"><svg class="touch-icon is-left" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></button>
+          <button type="button" class="touch-button" data-control="right" aria-label="Mover para a direita"><svg class="touch-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></button>
           <button type="button" class="touch-button touch-weapon" data-control="weapon" aria-label="Trocar de arma">ARMA</button>
         </div>
         <div class="touch-group">
-          <button type="button" class="touch-button" data-control="up" aria-label="Levantar o canhão">▲</button>
-          <button type="button" class="touch-button" data-control="down" aria-label="Abaixar o canhão">▼</button>
+          <button type="button" class="touch-button" data-control="up" aria-label="Levantar o canhão"><svg class="touch-icon is-up" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></button>
+          <button type="button" class="touch-button" data-control="down" aria-label="Abaixar o canhão"><svg class="touch-icon is-down" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg></button>
           <button type="button" class="touch-button touch-fire" data-control="fire" aria-label="Atirar: segure para carregar e solte">
             ATIRAR<small>segure e solte</small>
           </button>

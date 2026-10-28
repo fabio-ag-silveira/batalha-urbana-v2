@@ -407,6 +407,47 @@ body.touch .touch-controls {
   transition: transform 80ms ease, background 80ms ease;
 }
 
+.touch-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.touch-icon {
+  width: 26px;
+  height: 26px;
+  fill: currentColor;
+  pointer-events: none;
+}
+
+.touch-icon.is-left {
+  transform: rotate(180deg);
+}
+
+.touch-icon.is-up {
+  transform: rotate(-90deg);
+}
+
+.touch-icon.is-down {
+  transform: rotate(90deg);
+}
+
+.stage-button {
+  padding: 0;
+  line-height: 0;
+}
+
+.stage-icon {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
 .touch-button.is-pressed {
   background: #f0f0f2;
   color: #181a20;
