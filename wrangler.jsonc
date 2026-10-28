@@ -6,5 +6,9 @@
   "assets": {
     "directory": ".",
     "not_found_handling": "404-page"
-  }
+  },
+  // O deploy cria o registro DNS e o certificado do subdominio automaticamente.
+  "routes": [
+    { "pattern": "batalha.fabiosilveira.dev", "custom_domain": true }
+  ]
 }
