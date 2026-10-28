@@ -69,6 +69,21 @@ export function sampleIsland(island, x) {
   };
 }
 
+// Altura do chao da cidade (interpolacao das amostras); fora do mapa, a menor altura.
+export function groundHeightAt(map, x) {
+  const { heights, minX, step } = map.ground;
+  const position = (x - minX) / step;
+  const index = Math.floor(position);
+  if (index < 0) {
+    return heights[0];
+  }
+  if (index >= heights.length - 1) {
+    return heights[heights.length - 1];
+  }
+  const fraction = position - index;
+  return heights[index] + (heights[index + 1] - heights[index]) * fraction;
+}
+
 export function findIslandAt(map, x) {
   return map.islands.find((island) => x >= island.left && x <= island.right) ?? null;
 }
@@ -84,15 +99,19 @@ function isInsideIsland(point, map) {
   });
 }
 
-// Solidos destrutiveis: predios da cidade, ilhas e o que ha sobre elas (menos crateras).
+// Solidos destrutiveis: chao com relevo, predios, ilhas e o que ha sobre elas (menos crateras).
 export function isCartSolid(point, map, craters = []) {
-  const inside = map.colliders.some((collider) => isPointInsideRect(point, collider)) || isInsideIsland(point, map);
+  const inside = point.y <= groundHeightAt(map, point.x)
+    || map.colliders.some((collider) => isPointInsideRect(point, collider))
+    || isInsideIsland(point, map);
   return inside && !isInsideCrater(point, craters);
 }
 
-// Para projeteis: tambem o chao da rua e as paredes laterais, que ignoram crateras.
+// Para projeteis: tambem as paredes laterais e a rocha abaixo de STREET_Y, que ignoram crateras.
 export function isSolid(point, map, craters = []) {
-  return FIXED_COLLIDERS.some((collider) => isPointInsideRect(point, collider)) || isCartSolid(point, map, craters);
+  return point.y <= STREET_Y
+    || FIXED_COLLIDERS.some((collider) => isPointInsideRect(point, collider))
+    || isCartSolid(point, map, craters);
 }
 
 export function isOutOfBounds(point) {
@@ -112,7 +131,7 @@ export function getPlayerCenter(player) {
   return { x: player.position.x, y: player.position.y + 2 };
 }
 
-// O carrinho se apoia na rua ou quando ha solido logo abaixo de alguma das rodas.
+// O carrinho se apoia na rocha do fundo ou quando ha solido logo abaixo de alguma das rodas.
 export function isCartSupported(position, map, craters) {
   if (position.y <= STREET_Y + 0.001) {
     return true;

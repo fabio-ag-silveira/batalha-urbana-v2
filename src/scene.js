@@ -13,7 +13,7 @@ import {
   WIND_MAX,
 } from "./config.js";
 import { clamp, createRectPoints, createRng, transformPoints } from "./math.js";
-import { findIslandAt, getProjectileOrigin, sampleIsland } from "./physics.js";
+import { findIslandAt, getProjectileOrigin, groundHeightAt, sampleIsland } from "./physics.js";
 import { getMap } from "./map.js";
 
 const FONT = "'Trebuchet MS', 'Segoe UI', sans-serif";
@@ -34,44 +34,53 @@ function pickWindowColor(theme, rng) {
   return rng() < theme.litChance ? theme.windowLit : theme.windowDark;
 }
 
-function drawBuildingBody(renderer, origin, bottom, top, fill) {
-  drawRect(renderer, origin.x - 6, bottom, origin.x + 6, top, fill);
-  drawRect(renderer, origin.x + 3.2, bottom, origin.x + 6, top, "#000000", null, 0.2);
-  drawRect(renderer, origin.x - 6.6, top - 0.5, origin.x + 6.6, top + 0.8, fill);
-  drawRect(renderer, origin.x - 6.6, top + 0.3, origin.x + 6.6, top + 0.8, "#ffffff", null, 0.18);
+function drawBuildingBody(renderer, origin, bottom, top, fill, halfWidth) {
+  const shade = halfWidth * 0.47;
+  drawRect(renderer, origin.x - halfWidth, bottom, origin.x + halfWidth, top, fill);
+  drawRect(renderer, origin.x + halfWidth - shade, bottom, origin.x + halfWidth, top, "#000000", null, 0.2);
+  drawRect(renderer, origin.x - halfWidth - 0.6, top - 0.5, origin.x + halfWidth + 0.6, top + 0.8, fill);
+  drawRect(renderer, origin.x - halfWidth - 0.6, top + 0.3, origin.x + halfWidth + 0.6, top + 0.8, "#ffffff", null, 0.18);
 }
 
-function drawBuildingLarge(renderer, origin, scaleY, theme, rng) {
-  drawBuildingBody(renderer, origin, origin.y - 14 * scaleY, origin.y + 14 * scaleY, theme.buildings.large);
+// Colunas de janela a cada ~3 unidades, centralizadas na fachada.
+function windowColumns(origin, halfWidth) {
+  const count = Math.max(2, Math.floor((halfWidth * 2 - 2) / 3));
+  const spacing = (halfWidth * 2 - 2) / count;
+  return Array.from({ length: count }, (_, index) => origin.x - halfWidth + 1 + spacing * (index + 0.5));
+}
+
+function drawBuildingLarge(renderer, origin, scaleY, theme, rng, halfWidth = 6) {
+  drawBuildingBody(renderer, origin, origin.y - 14 * scaleY, origin.y + 14 * scaleY, theme.buildings.large, halfWidth);
+  const columns = windowColumns(origin, halfWidth);
   [11, 7, 3, -1, -5, -9].forEach((value) => {
     const rowY = origin.y + value * scaleY;
-    drawWindow(renderer, origin.x + 3, rowY, pickWindowColor(theme, rng));
-    drawWindow(renderer, origin.x - 3, rowY, pickWindowColor(theme, rng));
+    columns.forEach((x) => drawWindow(renderer, x, rowY, pickWindowColor(theme, rng)));
   });
   drawDoor(renderer, origin.x, origin.y - 10.5 * scaleY, theme.windowLit);
 }
 
-function drawBuildingSmall(renderer, origin, scaleY, theme, rng) {
-  drawBuildingBody(renderer, origin, origin.y - 14 * scaleY, origin.y + 10.5 * scaleY, theme.buildings.small);
+function drawBuildingSmall(renderer, origin, scaleY, theme, rng, halfWidth = 6) {
+  drawBuildingBody(renderer, origin, origin.y - 14 * scaleY, origin.y + 10.5 * scaleY, theme.buildings.small, halfWidth);
+  const columns = windowColumns(origin, halfWidth);
   [7.5, 3.5, -0.5, -4.5, -8.5].forEach((value) => {
     const rowY = origin.y + value * scaleY;
-    drawWindow(renderer, origin.x + 3, rowY, pickWindowColor(theme, rng));
-    drawWindow(renderer, origin.x - 3, rowY, pickWindowColor(theme, rng));
+    columns.forEach((x) => drawWindow(renderer, x, rowY, pickWindowColor(theme, rng)));
   });
   drawDoor(renderer, origin.x, origin.y - 10.5 * scaleY, theme.windowLit);
 }
 
-function drawTower(renderer, origin, theme, scaleY = 1) {
+function drawTower(renderer, origin, theme, scaleY = 1, halfWidth = 6) {
   const at = (value) => origin.y + value * scaleY;
-  drawRect(renderer, origin.x - 6, at(-14), origin.x + 6, at(14), theme.buildings.tower);
-  drawRect(renderer, origin.x + 3.2, at(-14), origin.x + 6, at(14), "#000000", null, 0.25);
-  renderer.drawEllipse({ x: origin.x, y: at(9) }, 3.75 * Math.min(1, scaleY * 1.1), { fill: theme.windowLit, stroke: "#111111" });
-  renderer.drawLine([{ x: origin.x, y: at(9) }, { x: origin.x, y: at(11.5) }], { stroke: "#111111", lineWidth: 1.5 });
-  renderer.drawLine([{ x: origin.x, y: at(9) }, { x: origin.x + 1.8, y: at(9) }], { stroke: "#111111", lineWidth: 1.5 });
+  const clockRadius = Math.min(3.75 * Math.min(1, scaleY * 1.1), halfWidth * 0.62);
+  drawRect(renderer, origin.x - halfWidth, at(-14), origin.x + halfWidth, at(14), theme.buildings.tower);
+  drawRect(renderer, origin.x + halfWidth * 0.53, at(-14), origin.x + halfWidth, at(14), "#000000", null, 0.25);
+  renderer.drawEllipse({ x: origin.x, y: at(9) }, clockRadius, { fill: theme.windowLit, stroke: "#111111" });
+  renderer.drawLine([{ x: origin.x, y: at(9) }, { x: origin.x, y: at(9) + clockRadius * 0.65 }], { stroke: "#111111", lineWidth: 1.5 });
+  renderer.drawLine([{ x: origin.x, y: at(9) }, { x: origin.x + clockRadius * 0.5, y: at(9) }], { stroke: "#111111", lineWidth: 1.5 });
   renderer.drawPolygon([
-    { x: origin.x - 6.6, y: at(14) },
+    { x: origin.x - halfWidth - 0.6, y: at(14) },
     { x: origin.x, y: at(20) },
-    { x: origin.x + 6.6, y: at(14) },
+    { x: origin.x + halfWidth + 0.6, y: at(14) },
   ], { fill: theme.buildings.tower, stroke: "#111111" });
   drawDoor(renderer, origin.x, at(-12.5), theme.windowLit);
 }
@@ -284,129 +293,187 @@ function drawBackdrop(renderer, state, theme) {
 function drawBuilding(renderer, building, theme, rng) {
   const origin = { x: building.x, y: building.y };
   if (building.type === "large") {
-    drawBuildingLarge(renderer, origin, building.scaleY, theme, rng);
+    drawBuildingLarge(renderer, origin, building.scaleY, theme, rng, building.halfWidth);
   } else if (building.type === "small") {
-    drawBuildingSmall(renderer, origin, building.scaleY, theme, rng);
+    drawBuildingSmall(renderer, origin, building.scaleY, theme, rng, building.halfWidth);
   } else if (building.type === "tower") {
-    drawTower(renderer, origin, theme, building.scaleY);
+    drawTower(renderer, origin, theme, building.scaleY, building.halfWidth);
   } else {
-    drawColumn(renderer, building, rng);
+    drawStub(renderer, building, theme, rng);
   }
 }
 
-// Coluna quebrada das ilhas de ruina: topo irregular.
-function drawColumn(renderer, column, rng) {
-  const { x, base, top } = column;
-  const crack = top - 0.6 - rng() * 1.2;
-  renderer.drawPolygon([
-    { x: x - 1.2, y: base },
-    { x: x - 1.2, y: top },
-    { x: x - 0.2, y: crack },
-    { x: x + 0.5, y: top - 0.3 },
-    { x: x + 1.2, y: crack + 0.4 },
-    { x: x + 1.2, y: base },
-  ], { fill: "#cfc6b6", stroke: "#3b352c", lineWidth: 1 });
-  renderer.drawPolygon(createRectPoints(x + 0.4, base, x + 1.2, crack), { fill: "#000000", alpha: 0.18 });
-  renderer.drawPolygon(createRectPoints(x - 1.6, base - 0.5, x + 1.6, base + 0.6), { fill: "#b7ad9b", stroke: "#3b352c", lineWidth: 1 });
+// Toco de predio dos escombros: corpo de predio com topo quebrado e janelas apagadas.
+function drawStub(renderer, stub, theme, rng) {
+  const { x, base, top, halfWidth, jag } = stub;
+  const outline = [{ x: x - halfWidth, y: base }];
+  jag.forEach((value, index) => {
+    const px = x - halfWidth + (halfWidth * 2 * index) / (jag.length - 1);
+    outline.push({ x: px, y: top - value * 2.5 });
+  });
+  outline.push({ x: x + halfWidth, y: base });
+  renderer.drawPolygon(outline, { fill: theme.buildings.small, stroke: "#111111", lineWidth: 1 });
+  windowColumns({ x }, halfWidth).forEach((wx) => {
+    for (let wy = base + 2.5; wy < top - 3; wy += 4) {
+      drawWindow(renderer, wx, wy, rng() < 0.2 ? theme.windowLit : theme.windowDark);
+    }
+  });
 }
 
-function drawDecor(renderer, decor, theme) {
+function drawDecor(renderer, decor, theme, nightLights) {
   const { x, y, size, variant } = decor;
-  if (decor.kind === "pine") {
-    renderer.drawPolygon(createRectPoints(x - 0.35, y - 0.5, x + 0.35, y + size * 0.3), { fill: theme.trunk });
-    [0, 1, 2].forEach((tier) => {
-      const bottom = y + size * (0.2 + tier * 0.25);
-      const half = size * (0.38 - tier * 0.09);
-      renderer.drawPolygon([
-        { x: x - half, y: bottom },
-        { x, y: bottom + size * 0.42 },
-        { x: x + half, y: bottom },
-      ], { fill: tier % 2 ? theme.foliage : theme.grass, stroke: "rgba(0, 0, 0, 0.3)", lineWidth: 1 });
+  const outline = { stroke: "#111111", lineWidth: 1 };
+  if (decor.kind === "tank") {
+    // Caixa d'agua sobre pernas.
+    const legHeight = size * 0.6;
+    renderer.drawLine([{ x: x - size * 0.4, y }, { x: x - size * 0.4, y: y + legHeight }], { stroke: "#111111", lineWidth: 1.5 });
+    renderer.drawLine([{ x: x + size * 0.4, y }, { x: x + size * 0.4, y: y + legHeight }], { stroke: "#111111", lineWidth: 1.5 });
+    drawRect(renderer, x - size * 0.55, y + legHeight, x + size * 0.55, y + legHeight + size, theme.buildings.large, "#111111");
+    renderer.drawPolygon([
+      { x: x - size * 0.6, y: y + legHeight + size },
+      { x, y: y + legHeight + size * 1.35 },
+      { x: x + size * 0.6, y: y + legHeight + size },
+    ], { fill: theme.buildings.tower, ...outline });
+  } else if (decor.kind === "antenna") {
+    renderer.drawLine([{ x, y }, { x, y: y + size }], { stroke: "#111111", lineWidth: 1.5 });
+    [0.55, 0.8].forEach((level) => {
+      renderer.drawLine([{ x: x - size * 0.18, y: y + size * level }, { x: x + size * 0.18, y: y + size * level }], { stroke: "#111111", lineWidth: 1.2 });
     });
-  } else if (decor.kind === "tree") {
-    renderer.drawPolygon(createRectPoints(x - 0.4, y - 0.5, x + 0.4, y + size * 0.55), { fill: theme.trunk });
-    renderer.drawEllipse({ x, y: y + size * 0.85 }, size * 0.45, { fill: theme.foliage, stroke: "rgba(0, 0, 0, 0.3)", lineWidth: 1 });
-    renderer.drawEllipse({ x: x - size * 0.15, y: y + size * 0.95 }, size * 0.18, { fill: "#ffffff", alpha: 0.12 });
-  } else if (decor.kind === "bush") {
-    renderer.drawEllipse({ x, y: y + size * 0.4 }, size, { fill: theme.foliage, stroke: "rgba(0, 0, 0, 0.25)", lineWidth: 1 });
-  } else if (decor.kind === "rock") {
+    renderer.drawEllipse({ x, y: y + size }, 0.45, { fill: nightLights ? "#ef4444" : "#7f1d1d", stroke: "#111111" });
+  } else if (decor.kind === "ac") {
+    drawRect(renderer, x - size, y - 0.2, x + size, y + size * 0.9, theme.concrete, "#111111");
+    renderer.drawEllipse({ x: x + size * 0.35, y: y + size * 0.4 }, size * 0.32, { fill: theme.buildings.small, stroke: "#111111" });
+  } else if (decor.kind === "lamp") {
+    renderer.drawLine([{ x, y }, { x, y: y + size }], { stroke: "#111111", lineWidth: 1.8 });
+    renderer.drawLine([{ x, y: y + size }, { x: x + size * 0.25, y: y + size }], { stroke: "#111111", lineWidth: 1.8 });
+    renderer.drawEllipse({ x: x + size * 0.25, y: y + size - 0.4 }, 0.6, { fill: nightLights ? theme.lamp : "#d9d4c4", stroke: "#111111" });
+  } else if (decor.kind === "bench") {
+    drawRect(renderer, x - size, y + 0.8, x + size, y + 1.3, theme.rebar, "#111111");
+    drawRect(renderer, x - size, y + 1.3, x + size, y + 2.3, theme.rebar, "#111111");
+    renderer.drawLine([{ x: x - size * 0.8, y }, { x: x - size * 0.8, y: y + 0.8 }], { stroke: "#111111", lineWidth: 1.2 });
+    renderer.drawLine([{ x: x + size * 0.8, y }, { x: x + size * 0.8, y: y + 0.8 }], { stroke: "#111111", lineWidth: 1.2 });
+  } else if (decor.kind === "cone") {
+    renderer.drawPolygon([{ x: x - size, y }, { x, y: y + size * 2.2 }, { x: x + size, y }], { fill: "#f97316", ...outline });
+    drawRect(renderer, x - size * 0.5, y + size * 0.8, x + size * 0.5, y + size * 1.1, "#ffffff", null);
+  } else if (decor.kind === "debris") {
     renderer.drawPolygon([
-      { x: x - size, y: y - 0.3 },
-      { x: x - size * 0.7, y: y + size * (0.6 + variant * 0.3) },
-      { x: x + size * 0.1, y: y + size * 0.9 },
-      { x: x + size * 0.8, y: y + size * 0.5 },
-      { x: x + size, y: y - 0.3 },
-    ], { fill: theme.rock, stroke: "rgba(0, 0, 0, 0.4)", lineWidth: 1 });
-  } else if (decor.kind === "crystal") {
-    const lean = (variant - 0.5) * 1.2;
-    renderer.drawPolygon([
-      { x: x - size * 0.22, y: y - 0.2 },
-      { x: x - size * 0.25 + lean, y: y + size * 0.6 },
-      { x: x + lean, y: y + size },
-      { x: x + size * 0.25 + lean, y: y + size * 0.6 },
-      { x: x + size * 0.22, y: y - 0.2 },
-    ], { fill: theme.crystal, stroke: "#ffffff", lineWidth: 1, alpha: 0.9 });
-  } else if (decor.kind === "root") {
-    const sway = (variant - 0.5) * 2;
-    renderer.drawLine([
-      { x, y },
-      { x: x + sway * 0.5, y: y - size * 0.5 },
-      { x: x + sway, y: y - size },
-    ], { stroke: theme.root, lineWidth: 1.5, alpha: 0.85 });
+      { x: x - size, y: y - 0.2 },
+      { x: x - size * 0.6, y: y + size * (0.7 + variant * 0.4) },
+      { x: x + size * 0.4, y: y + size * 0.9 },
+      { x: x + size, y: y - 0.2 },
+    ], { fill: theme.concrete, ...outline });
+  } else if (decor.kind === "rebar") {
+    renderer.drawLine([{ x, y }, { x: x + variant * size, y: y + size * 0.3 }], { stroke: theme.rebar, lineWidth: 1.5 });
+  } else if (decor.kind === "pipe") {
+    const end = { x: x + (variant - 0.5) * 2, y: y - size };
+    renderer.drawLine([{ x, y }, end], { stroke: "#111111", lineWidth: 2.6 });
+    renderer.drawLine([{ x, y }, end], { stroke: theme.buildings.large, lineWidth: 1.4 });
   }
 }
 
-function drawFloatingIsland(renderer, island, theme, rng) {
-  const context = renderer.context;
-  const points = island.top.map((top, index) => ({ x: island.left + index * island.step, y: top }));
+// Pedaco de cidade flutuando: concreto chapado com contorno, asfalto e calcada no topo.
+function drawFloatingIsland(renderer, island, theme, rng, nightLights) {
+  const surface = island.top.map((top, index) => ({ x: island.left + index * island.step, y: top }));
   const underside = island.bottom.map((bottom, index) => ({ x: island.left + index * island.step, y: bottom })).reverse();
 
-  const top = renderer.toScreen({ x: 0, y: island.topY }).y;
-  const bottom = renderer.toScreen({ x: 0, y: island.bottomY }).y;
-  const gradient = context.createLinearGradient(0, top, 0, bottom);
-  gradient.addColorStop(0, theme.soil);
-  gradient.addColorStop(0.55, theme.rock);
-  gradient.addColorStop(1, "#1d1a1f");
-  renderer.drawPolygon([...points, ...underside], { fill: gradient, stroke: "rgba(0, 0, 0, 0.45)", lineWidth: 1.2 });
-
-  // Estratos de rocha acompanhando o topo.
-  [3, 6.5].forEach((depth) => {
-    const strata = points
-      .filter((point, index) => point.y - depth > island.bottom[index] + 1)
-      .map((point) => ({ x: point.x, y: point.y - depth }));
-    if (strata.length > 1) {
-      renderer.drawLine(strata, { stroke: "#000000", lineWidth: 1, alpha: 0.15 });
-    }
+  island.decor.filter((decor) => decor.kind === "pipe").forEach((decor) => drawDecor(renderer, decor, theme, nightLights));
+  renderer.drawPolygon([...surface, ...underside], { fill: theme.concrete, stroke: "#111111", lineWidth: 1.2 });
+  renderer.drawPolygon([...surface, ...surface.map((point) => ({ x: point.x, y: point.y - 1.6 })).reverse()], {
+    fill: theme.asphalt,
   });
+  renderer.drawLine(surface, { stroke: theme.curb, lineWidth: 2 });
 
-  // Grama no topo; na ilha rochosa so em trechos.
-  const grassBand = [];
-  points.forEach((point, index) => {
-    const covered = island.type !== "rocky" || Math.floor(index / 6) % 3 === 0;
-    if (covered) {
-      grassBand.push(point);
-    } else if (grassBand.length) {
-      renderer.drawLine(grassBand.splice(0), { stroke: theme.grass, lineWidth: 3 * renderer.camera.zoom });
-    }
+  // Corte de predio: lajes entre andares e uma fileira de salas expostas sob o asfalto.
+  [5.5, 10].forEach((depth) => {
+    let run = [];
+    const flush = () => {
+      if (run.length > 1) {
+        renderer.drawLine(run, { stroke: "#111111", lineWidth: 1, alpha: 0.4 });
+      }
+      run = [];
+    };
+    surface.forEach((point, index) => {
+      if (point.y - depth > island.bottom[index] + 1) {
+        run.push({ x: point.x, y: island.topY - depth });
+      } else {
+        flush();
+      }
+    });
+    flush();
   });
-  if (grassBand.length > 1) {
-    renderer.drawLine(grassBand, { stroke: theme.grass, lineWidth: 3 * renderer.camera.zoom });
+  for (let x = island.left + 3; x <= island.right - 3; x += 3.5) {
+    const sample = sampleIsland(island, x);
+    if (sample.top - sample.bottom < 7) {
+      continue;
+    }
+    const lit = nightLights && rng() < 0.3;
+    drawRect(renderer, x - 0.9, island.topY - 4.6, x + 0.9, island.topY - 2.6, lit ? theme.windowLit : "#1a1a1f", "#111111");
   }
 
-  island.decor.filter((decor) => decor.kind === "root").forEach((decor) => drawDecor(renderer, decor, theme));
+  // Rachaduras no concreto.
+  const crackCount = 1 + Math.floor((island.right - island.left) / 25);
+  for (let index = 0; index < crackCount; index += 1) {
+    const x = island.left + 4 + rng() * (island.right - island.left - 8);
+    const sample = sampleIsland(island, x);
+    const startY = sample.top - 2.2;
+    const length = (sample.top - sample.bottom) * (0.3 + rng() * 0.4);
+    renderer.drawLine([
+      { x, y: startY },
+      { x: x + (rng() - 0.5) * 2, y: startY - length * 0.5 },
+      { x: x + (rng() - 0.5) * 3, y: startY - length },
+    ], { stroke: "#111111", lineWidth: 1, alpha: 0.35 });
+  }
+
+  island.decor.filter((decor) => decor.kind === "rebar").forEach((decor) => drawDecor(renderer, decor, theme, nightLights));
   island.buildings.forEach((building) => drawBuilding(renderer, building, theme, rng));
-  island.decor.filter((decor) => decor.kind !== "root").forEach((decor) => drawDecor(renderer, decor, theme));
+  island.decor
+    .filter((decor) => decor.kind !== "pipe" && decor.kind !== "rebar")
+    .forEach((decor) => drawDecor(renderer, decor, theme, nightLights));
 }
 
-// Cidade e ilhas numa camada cacheada; crateras recortam tudo que e destrutivel.
+function groundSurface(map) {
+  return map.ground.heights.map((height, index) => ({ x: map.ground.minX + index * map.ground.step, y: height }));
+}
+
+// Terra por baixo do asfalto: fica fora da camada recortada, entao aparece dentro das crateras.
+function drawUnderground(renderer, theme, map) {
+  const surface = groundSurface(map);
+  renderer.drawPolygon([
+    { x: -420, y: -60 },
+    { x: -420, y: surface[0].y },
+    ...surface,
+    { x: 420, y: surface[surface.length - 1].y },
+    { x: 420, y: -60 },
+  ], { fill: theme.underground });
+  renderer.drawPolygon(createRectPoints(-420, -60, 420, STREET_Y), { fill: "#000000", alpha: 0.35 });
+}
+
+function drawGround(renderer, theme, map) {
+  const surface = groundSurface(map);
+  renderer.drawPolygon([
+    { x: -420, y: -60 },
+    { x: -420, y: surface[0].y },
+    ...surface,
+    { x: 420, y: surface[surface.length - 1].y },
+    { x: 420, y: -60 },
+  ], { fill: theme.street, stroke: "#111111", lineWidth: 1 });
+  renderer.drawLine([{ x: -420, y: surface[0].y }, ...surface, { x: 420, y: surface[surface.length - 1].y }], {
+    stroke: theme.curb,
+    lineWidth: 2,
+  });
+}
+
+// Chao, cidade e ilhas numa camada cacheada; crateras recortam tudo que e destrutivel.
 function drawWorld(renderer, state, theme, map) {
   const lastCrater = state.craters[state.craters.length - 1];
   const version = `${state.seed}:${state.theme}:${state.craters.length}:${lastCrater?.x ?? ""}:${renderer.cameraKey}`;
+  const nightLights = theme.id === "night" || theme.id === "dusk";
 
   renderer.drawLayer("world", version, (context) => {
     const rng = createRng(state.seed);
     map.city.buildings.forEach((building) => drawBuilding(renderer, building, theme, rng));
-    map.islands.forEach((island) => drawFloatingIsland(renderer, island, theme, rng));
+    drawGround(renderer, theme, map);
+    map.islands.forEach((island) => drawFloatingIsland(renderer, island, theme, rng, nightLights));
 
     if (state.craters.length) {
       // Primeiro queima a borda (so onde ha solido), depois recorta o buraco.
@@ -417,11 +484,6 @@ function drawWorld(renderer, state, theme, map) {
       context.globalCompositeOperation = "source-over";
     }
   });
-}
-
-function drawStreet(renderer, theme) {
-  drawRect(renderer, -420, -60, 420, -12.5, theme.street, null);
-  renderer.drawLine([{ x: -420, y: -12.5 }, { x: 420, y: -12.5 }], { stroke: theme.curb, lineWidth: 2 });
 }
 
 function buildCannonPolygon(player, pivot, recoil) {
@@ -437,11 +499,20 @@ function cartTilt(player, map) {
   const onBuilding = [-2.5, 2.5].some((offset) => map.colliders.some((collider) =>
     Math.abs(collider.x - (x + offset)) <= collider.halfWidth &&
     Math.abs(collider.y + collider.halfHeight - (y - 2.5)) < 1.5));
-  if (player.falling || onBuilding || !island || Math.abs(sampleIsland(island, x).top - (y - 2.5)) > 2) {
+  if (player.falling || onBuilding) {
     return 0;
   }
-  const left = sampleIsland(island, Math.max(island.left, x - 3)).top;
-  const right = sampleIsland(island, Math.min(island.right, x + 3)).top;
+  let left;
+  let right;
+  if (island && Math.abs(sampleIsland(island, x).top - (y - 2.5)) <= 2) {
+    left = sampleIsland(island, Math.max(island.left, x - 3)).top;
+    right = sampleIsland(island, Math.min(island.right, x + 3)).top;
+  } else if (Math.abs(groundHeightAt(map, x) - (y - 2.5)) <= 2) {
+    left = groundHeightAt(map, x - 3);
+    right = groundHeightAt(map, x + 3);
+  } else {
+    return 0;
+  }
   return clamp((Math.atan((right - left) / 6) * 180) / Math.PI, -30, 30);
 }
 
@@ -528,8 +599,10 @@ function drawRain(renderer, wind, time) {
   renderer.applyStyle({ stroke: "rgba(200, 220, 255, 0.35)", lineWidth: 1 });
 }
 
-function drawFog(renderer, theme, time) {
-  const surfaceY = renderer.toScreen({ x: 0, y: STREET_Y }).y;
+function drawFog(renderer, theme, time, map) {
+  const heights = map.ground.heights;
+  const averageGround = heights.reduce((sum, height) => sum + height, 0) / heights.length;
+  const surfaceY = renderer.toScreen({ x: 0, y: averageGround }).y;
   renderer.fillVerticalGradient(["rgba(0, 0, 0, 0)", theme.fog, theme.fog], surfaceY - renderer.height * 0.45, renderer.height + 40);
   const rng = createRng(77);
   for (let index = 0; index < 6; index += 1) {
@@ -767,12 +840,12 @@ export function drawScene(renderer, state, effects, time) {
   context.save();
   context.translate(shake.x, shake.y);
   drawBackdrop(renderer, state, theme);
+  drawUnderground(renderer, theme, map);
   drawWorld(renderer, state, theme, map);
-  drawStreet(renderer, theme);
   state.crates.forEach((crate) => drawCrate(renderer, crate, time));
   state.players.forEach((player) => drawCart(renderer, player, effects.getRecoil(player.id), map));
   if (state.modifier === "fog") {
-    drawFog(renderer, theme, time);
+    drawFog(renderer, theme, time, map);
   }
   if (aiming) {
     drawAimGuide(renderer, current);

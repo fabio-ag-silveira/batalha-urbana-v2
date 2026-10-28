@@ -26,12 +26,13 @@ A configuração fica em [wrangler.jsonc](/c:/repos/batalha-urbana/wrangler.json
 
 Cada rodada gera um **mapa novo** a partir de uma seed:
 
-- **Cidade:** a mesma do jogo original no visual, mas o arranjo muda. A densidade (espaçada, normal ou densa), a quantidade e a altura dos prédios e a largura dos becos variam a cada rodada.
-- **Ilhas flutuantes:** de 3 a 6 ilhas no céu, em alturas diferentes, de quatro tipos:
-  - **bosque:** pinheiros e árvores;
-  - **rochosa:** pedras e cristais;
-  - **vila:** casinhas;
-  - **ruína:** colunas quebradas.
+- **Relevo:** o chão da cidade tem morros, ladeiras e vales, e as crateras também cavam o chão.
+- **Cidade:** visual do jogo original, mas com densidade (espaçada, normal ou densa), quantidade, largura e altura dos prédios e largura dos becos variando a cada rodada. Os prédios ficam plantados no relevo.
+- **Ilhas flutuantes:** de 3 a 6 "pedaços de cidade" no céu, em alturas diferentes. São lajes de concreto e asfalto com bordas quebradas, vergalhões e canos, de quatro tipos:
+  - **telhado:** caixa d'água, antenas, ar-condicionado;
+  - **quarteirão:** prédios pequenos;
+  - **praça:** postes, banco, cones;
+  - **escombros:** toco de prédio e entulho.
 
 Os carrinhos podem nascer nas ilhas, nos telhados ou nos becos. Cada jogador começa com 100 HP. Vence a rodada quem destruir o carrinho adversário, e a partida vai para quem vencer 3 rodadas.
 
@@ -71,8 +72,8 @@ Os carrinhos podem nascer nas ilhas, nos telhados ou nos becos. Cada jogador com
 ## Estrutura
 
 - [src/game.js](/c:/repos/batalha-urbana/src/game.js): estado da partida, fases do turno, entrada, dano, quedas e IA.
-- [src/map.js](/c:/repos/batalha-urbana/src/map.js): gerador do mapa a partir da seed da rodada: cidade procedural, ilhas flutuantes com conteúdo por tipo e pontos de spawn.
-- [src/physics.js](/c:/repos/batalha-urbana/src/physics.js): trajetória com vento e gravidade, colisão com rua/prédios/ilhas/crateras e movimento dos carrinhos.
+- [src/map.js](/c:/repos/batalha-urbana/src/map.js): gerador do mapa a partir da seed da rodada: relevo do chão, cidade procedural, ilhas flutuantes com conteúdo por tipo e pontos de spawn.
+- [src/physics.js](/c:/repos/batalha-urbana/src/physics.js): trajetória com vento e gravidade, colisão com chão/prédios/ilhas/crateras e movimento dos carrinhos.
 - [src/scene.js](/c:/repos/batalha-urbana/src/scene.js): céu, cidade, ilhas flutuantes, carrinhos, caixas, clima e painel do topo.
 - [src/renderer.js](/c:/repos/batalha-urbana/src/renderer.js): renderer Canvas, conversão de coordenadas e camadas em cache.
 - [src/camera.js](/c:/repos/batalha-urbana/src/camera.js): câmera dinâmica (zoom e acompanhamento), só no desenho.
@@ -84,7 +85,7 @@ Os carrinhos podem nascer nas ilhas, nos telhados ou nos becos. Cada jogador com
 
 ## Coordenadas
 
-O mapa fixo do legado deu lugar à cidade procedural com ilhas flutuantes, mas o jogo continua usando as `coordenadas de gameplay` do original. A rua fica em `y = -16`, e as ilhas flutuam entre `y = 30` e `y = 125`. O renderer converte para a tela com a mesma transformação do OpenGL antigo:
+O mapa fixo do legado deu lugar à cidade procedural com ilhas flutuantes, mas o jogo continua usando as `coordenadas de gameplay` do original. O chão varia entre `y = -14` e `y = 22`, com rocha indestrutível abaixo de `y = -16` (o antigo nível da rua), e as ilhas flutuam entre `y = 30` e `y = 125`. O renderer converte para a tela com a mesma transformação do OpenGL antigo:
 
 - `xTela = xGameplay * 0.2`
 - `yTela = (yGameplay - 115) * 0.3`

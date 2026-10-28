@@ -120,16 +120,34 @@ export const PHASE_DELAYS = {
 };
 
 // Mapa procedural: cidade no chao (visual original) e ilhas flutuando no ceu.
+// Chao com relevo: base, ondas longas, morros e vales, e uma irregularidade fina.
+export const GROUND_GEN = {
+  minX: -210,
+  maxX: 210,
+  base: -9,
+  minY: -14,
+  maxY: 22,
+  waves: [2, 3],
+  waveAmplitude: [1.5, 6],
+  wavelength: [60, 200],
+  hills: [0, 2],
+  hillHeight: [8, 20],
+  hillWidth: [20, 50],
+  valleyChance: 0.45,
+  valleyDepth: [3, 6],
+  roughness: 0.6,
+};
+
 export const CITY_GEN = {
   minX: -195,
   maxX: 195,
-  buildingWidth: 12,
-  baseY: -20,
-  scaleY: [0.7, 1.35],
+  halfWidth: [4, 10],
+  scaleY: [0.6, 1.6],
+  maxSlope: 7,
   blockGap: [1, 3],
   alleyGap: [14, 32],
   minAlleys: 2,
-  minSpawnAlley: 16,
+  minSpawnAlley: 14,
   // Chance de abrir um beco depois de cada predio, por densidade da rodada.
   densities: {
     sparse: { label: "espaçada", alleyChance: 0.55, weight: 1 },
@@ -148,20 +166,19 @@ export const ISLAND_GEN = {
   gapX: 12,
   gapY: 22,
   types: {
-    grove: { id: "grove", label: "Bosque", weight: 3 },
-    rocky: { id: "rocky", label: "Rochosa", weight: 2 },
-    village: { id: "village", label: "Vila", weight: 2 },
-    ruins: { id: "ruins", label: "Ruína", weight: 1.5 },
+    rooftop: { id: "rooftop", label: "Telhado", weight: 2.5 },
+    block: { id: "block", label: "Quarteirão", weight: 2.5 },
+    plaza: { id: "plaza", label: "Praça", weight: 2 },
+    rubble: { id: "rubble", label: "Escombros", weight: 1.5 },
   },
   minSpawnDistance: 80,
   islandSpawnPreference: 0.7,
 };
 
-// Chao da rua e paredes laterais: fixos, ignoram crateras.
+// Paredes laterais: fixas, ignoram crateras. Abaixo de STREET_Y ha rocha indestrutivel.
 export const FIXED_COLLIDERS = [
   { x: 205, y: -7.5, halfWidth: 7, halfHeight: 1500, kind: "wall" },
   { x: -205, y: -7.5, halfWidth: 7, halfHeight: 1500, kind: "wall" },
-  { x: 0, y: -28, halfWidth: 1000, halfHeight: 15.5, kind: "ground" },
 ];
 
 export const ROUND_MODIFIERS = {
@@ -202,13 +219,11 @@ export const SKY_THEMES = {
     litChance: 0.25,
     street: "#3b3d42",
     curb: "#8d9096",
-    grass: "#5fa34a",
-    soil: "#8b6b43",
-    rock: "#6b5d52",
-    foliage: "#3f8f3a",
-    trunk: "#5b3f26",
-    crystal: "#7dd3fc",
-    root: "#4a3a2a",
+    concrete: "#a3a19b",
+    asphalt: "#4a4c52",
+    rebar: "#7a4a2e",
+    underground: "#4a3b2f",
+    lamp: "#ffe9a8",
     fog: "rgba(220, 232, 238, 0.55)",
     stars: false,
   },
@@ -226,13 +241,11 @@ export const SKY_THEMES = {
     litChance: 0.55,
     street: "#2b2830",
     curb: "#7a6f7e",
-    grass: "#6f8f4a",
-    soil: "#6e4b3a",
-    rock: "#4e3c4c",
-    foliage: "#4f6f3a",
-    trunk: "#3f2a24",
-    crystal: "#f9a8d4",
-    root: "#3b2a2a",
+    concrete: "#8a7f86",
+    asphalt: "#3a3540",
+    rebar: "#6a3d2a",
+    underground: "#3a2b28",
+    lamp: "#ffd38a",
     fog: "rgba(240, 190, 170, 0.45)",
     stars: false,
   },
@@ -250,13 +263,11 @@ export const SKY_THEMES = {
     litChance: 0.75,
     street: "#15171f",
     curb: "#3c4256",
-    grass: "#2f5a3a",
-    soil: "#3d3328",
-    rock: "#2a2636",
-    foliage: "#1f4a33",
-    trunk: "#2a1f18",
-    crystal: "#a5b4fc",
-    root: "#221a14",
+    concrete: "#4a5066",
+    asphalt: "#1f222c",
+    rebar: "#5a3a28",
+    underground: "#1d1814",
+    lamp: "#ffe27a",
     fog: "rgba(120, 140, 190, 0.4)",
     stars: true,
   },
