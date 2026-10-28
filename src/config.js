@@ -17,12 +17,6 @@ export const TIME_SCALE = 100 / 30;
 export const CART_SIZE = 3.5;
 export const PLAYER_HITBOX = { halfWidth: 4, minY: -2, maxY: 6 };
 
-export const BACKGROUND_COLORS = [
-  "#5da3a3",
-  "#8f92c9",
-  "#9d9650",
-];
-
 export const GAME_MODES = {
   local: "local",
   ai: "ai",
@@ -38,35 +32,116 @@ export const AI_DIFFICULTIES = {
 export const DEFAULT_GAME_MODE = GAME_MODES.ai;
 export const DEFAULT_AI_DIFFICULTY = AI_DIFFICULTIES.medium;
 export const AI_THINK_DELAY_MS = 700;
-export const AI_ANGLE_STEP = 3;
-export const AI_VELOCITY_STEP = 2;
 export const AI_PRESETS = {
   [AI_DIFFICULTIES.easy]: {
-    label: "IA facil",
+    label: "IA fácil",
     angleStep: 9,
-    velocityStep: 8,
+    velocityStep: 6,
     simulationStep: 0.08,
-    aimJitter: { angle: 6, velocity: 12 },
+    aimJitter: { angle: 6, velocity: 5 },
+    windKnowledge: 0.3,
     candidatePool: 12,
     refinement: false,
   },
   [AI_DIFFICULTIES.medium]: {
-    label: "IA media",
+    label: "IA média",
     angleStep: 4,
     velocityStep: 3,
     simulationStep: 0.06,
-    aimJitter: { angle: 2, velocity: 4 },
+    aimJitter: { angle: 2, velocity: 2 },
+    windKnowledge: 0.75,
     candidatePool: 6,
     refinement: false,
   },
   [AI_DIFFICULTIES.hard]: {
-    label: "IA dificil",
+    label: "IA difícil",
     angleStep: 3,
     velocityStep: 2,
-    simulationStep: 0.03,
+    simulationStep: 0.04,
     aimJitter: { angle: 0, velocity: 0 },
+    windKnowledge: 1,
     candidatePool: 1,
     refinement: true,
+  },
+};
+
+export const MAX_HP = 100;
+export const ROUNDS_TO_WIN = 3;
+export const EXPLOSION_RADIUS = 14;
+export const EXPLOSION_DAMAGE = 40;
+export const DIRECT_HIT_BONUS = 10;
+export const CRATER_RADIUS = 7;
+export const MAX_CRATERS = 160;
+export const WIND_MAX = 1.2;
+export const POWER_MIN_VELOCITY = 10;
+export const POWER_MAX_VELOCITY = 75;
+export const CHARGE_SECONDS = 1.2;
+export const AIM_SPEED = 45;
+export const ELEVATION_LIMITS = { min: -15, max: 90 };
+export const MOVE_SPEED = 22;
+export const FUEL_PER_TURN = 40;
+export const TURN_TIME_MS = 20000;
+export const CART_GRAVITY = 70;
+export const SAFE_FALL = 10;
+export const STREET_Y = -16;
+export const CART_X_LIMIT = 194;
+export const PROJECTILE_SUBSTEP = 0.01;
+export const PHASE_DELAYS = {
+  roundStart: 1600,
+  settle: 700,
+  timeout: 400,
+  roundOver: 2600,
+  matchOver: 8000,
+};
+
+export const SKY_THEMES = {
+  day: {
+    id: "day",
+    sky: ["#3f8fd2", "#8cc6e6", "#d8eef2"],
+    body: { kind: "sun", color: "#fff6cf", glow: "rgba(255, 240, 180, 0.45)" },
+    cloud: "rgba(255, 255, 255, 0.75)",
+    distant: "#8fb3c6",
+    citadel: { fill: "#4d6b7c", window: "#5f7f90" },
+    haze: "rgba(225, 240, 245, 0.45)",
+    buildings: { large: "#7a7a7a", small: "#4a4a4a", tower: "#1c1c1c" },
+    windowLit: "#f6e151",
+    windowDark: "#d9dfe4",
+    litChance: 0.25,
+    street: "#3b3d42",
+    curb: "#8d9096",
+    stars: false,
+  },
+  dusk: {
+    id: "dusk",
+    sky: ["#2d2457", "#b4587a", "#f4a96a"],
+    body: { kind: "sun", color: "#ffcf86", glow: "rgba(255, 170, 110, 0.5)" },
+    cloud: "rgba(255, 196, 170, 0.55)",
+    distant: "#7a4f74",
+    citadel: { fill: "#3a2440", window: "#5a3a5e" },
+    haze: "rgba(244, 169, 106, 0.35)",
+    buildings: { large: "#5e5560", small: "#3a3340", tower: "#17121c" },
+    windowLit: "#ffd36b",
+    windowDark: "#2a2430",
+    litChance: 0.55,
+    street: "#2b2830",
+    curb: "#7a6f7e",
+    stars: false,
+  },
+  night: {
+    id: "night",
+    sky: ["#04071a", "#0f1a3d", "#2a3a68"],
+    body: { kind: "moon", color: "#f2efdc", glow: "rgba(200, 210, 255, 0.28)" },
+    cloud: "rgba(150, 165, 210, 0.22)",
+    distant: "#18223f",
+    citadel: { fill: "#0a0e1e", window: "#1b2340" },
+    haze: "rgba(60, 80, 140, 0.3)",
+    buildings: { large: "#2b3042", small: "#1d2131", tower: "#0b0d16" },
+    windowLit: "#ffe27a",
+    windowDark: "#141826",
+    litChance: 0.75,
+    street: "#15171f",
+    curb: "#3c4256",
+    stars: true,
   },
 };
 
@@ -74,13 +149,8 @@ export const PLAYER_DEFAULTS = [
   {
     id: 1,
     label: "Player 1",
-    statsColor: "#0d8e98",
-    controls: { up: "w", down: "s", left: "a", right: "d", fire: "f" },
-    velocity: 30,
-    angle: 85,
-    hitTint: ["#ffffff", "#7fcfd4", "#050505"],
-    accent: "#00c8d7",
-    wheel: "#00c8d7",
+    color: "#00c8d7",
+    shade: "#0d8e98",
     spawns: [
       { x: -123, y: -16 },
       { x: -90, y: 7 },
@@ -91,13 +161,8 @@ export const PLAYER_DEFAULTS = [
   {
     id: 2,
     label: "Player 2",
-    statsColor: "#9c2d2d",
-    controls: { up: "i", down: "k", left: "j", right: "l", fire: "h" },
-    velocity: 30,
-    angle: 85,
-    hitTint: ["#ff8080", "#c55c5c", "#050505"],
-    accent: "#dd3232",
-    wheel: "#dd3232",
+    color: "#ff4a4a",
+    shade: "#9c2d2d",
     spawns: [
       { x: -180, y: 7.7 },
       { x: 60, y: 7.7 },
@@ -158,7 +223,7 @@ export const STATIC_COLLIDERS = [
   { x: 150, y: -5, halfWidth: 7, halfHeight: 15 },
   { x: 165, y: -5, halfWidth: 7, halfHeight: 15 },
   { x: 180, y: -7.5, halfWidth: 7, halfHeight: 15 },
-  { x: 205, y: -7.5, halfWidth: 7, halfHeight: 1500 },
-  { x: -205, y: -7.5, halfWidth: 7, halfHeight: 1500 },
-  { x: 0, y: -28, halfWidth: 1000, halfHeight: 15.5 },
+  { x: 205, y: -7.5, halfWidth: 7, halfHeight: 1500, kind: "wall" },
+  { x: -205, y: -7.5, halfWidth: 7, halfHeight: 1500, kind: "wall" },
+  { x: 0, y: -28, halfWidth: 1000, halfHeight: 15.5, kind: "ground" },
 ];

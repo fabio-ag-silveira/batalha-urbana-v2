@@ -30,9 +30,10 @@
         <div class="control-group">
           <p class="control-title">Dificuldade IA</p>
           <div class="button-row" id="difficultyButtons">
-            <button type="button" class="hud-button" data-difficulty="easy">Facil</button>
-            <button type="button" class="hud-button" data-difficulty="medium">Media</button>
-            <button type="button" class="hud-button" data-difficulty="hard">Dificil</button>
+            <button type="button" class="hud-button" data-difficulty="easy">Fácil</button>
+            <button type="button" class="hud-button" data-difficulty="medium">Média</button>
+            <button type="button" class="hud-button" data-difficulty="hard">Difícil</button>
+            <button type="button" class="hud-button" id="soundButton">Som: ligado</button>
           </div>
         </div>
         <div class="control-group lan-group">
@@ -47,7 +48,7 @@
             <button type="button" class="hud-button" id="leaveRoomButton">Sair</button>
           </div>
           <div id="roomList" class="room-list"></div>
-          <p id="connectionStatus" class="note">Nao conectado</p>
+          <p id="connectionStatus" class="note">Não conectado</p>
         </div>
       </div>
 
@@ -56,9 +57,9 @@
           <p class="eyebrow">Player 1</p>
           <div id="playerOneStats" class="stats-panel"></div>
           <div class="shortcut-list">
-            <span class="shortcut-pill"><strong>W/S</strong> velocidade</span>
-            <span class="shortcut-pill"><strong>A/D</strong> angulo</span>
-            <span class="shortcut-pill"><strong>F</strong> atira</span>
+            <span class="shortcut-pill"><strong>W/S</strong> mira</span>
+            <span class="shortcut-pill"><strong>A/D</strong> move</span>
+            <span class="shortcut-pill"><strong>F</strong> segure e solte</span>
           </div>
         </article>
 
@@ -66,9 +67,9 @@
           <p class="eyebrow">Player 2</p>
           <div id="playerTwoStats" class="stats-panel"></div>
           <div class="shortcut-list">
-            <span class="shortcut-pill"><strong>I/K</strong> velocidade</span>
-            <span class="shortcut-pill"><strong>J/L</strong> angulo</span>
-            <span class="shortcut-pill"><strong>H</strong> atira</span>
+            <span class="shortcut-pill"><strong>I/K</strong> mira</span>
+            <span class="shortcut-pill"><strong>J/L</strong> move</span>
+            <span class="shortcut-pill"><strong>H</strong> segure e solte</span>
           </div>
         </article>
       </div>
@@ -76,10 +77,11 @@
       <div class="hud-card footer-card">
         <p class="eyebrow">Atalhos</p>
         <div class="shortcut-list compact">
+          <span class="shortcut-pill"><strong>Setas + Espaço</strong> jogador da vez</span>
           <span class="shortcut-pill"><strong>M</strong> troca modo</span>
           <span class="shortcut-pill"><strong>N</strong> muda IA</span>
+          <span class="shortcut-pill"><strong>U</strong> som</span>
           <span class="shortcut-pill"><strong>B</strong> reinicia</span>
-          <span class="shortcut-pill"><strong>Q</strong> pausa captura</span>
         </div>
       </div>
     </section>

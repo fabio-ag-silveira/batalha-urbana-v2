@@ -6,7 +6,7 @@
   --text: #f3f3f5;
   --muted: #a5a8ae;
   --player-one: #0d8e98;
-  --player-two: #9c2d2d;
+  --player-two: #ff4a4a;
   --accent: #f1f1f3;
   --accent-soft: #2f333c;
   --shadow: 0 24px 44px rgba(0, 0, 0, 0.34);
@@ -87,6 +87,57 @@ body {
 
 .player-two {
   border-left-color: var(--player-two);
+}
+
+.player-card {
+  transition: box-shadow 200ms ease, transform 200ms ease;
+}
+
+.player-one.is-turn {
+  box-shadow: var(--shadow), 0 0 0 1px rgba(0, 200, 215, 0.45), 0 0 22px rgba(0, 200, 215, 0.22);
+}
+
+.player-two.is-turn {
+  box-shadow: var(--shadow), 0 0 0 1px rgba(255, 74, 74, 0.45), 0 0 22px rgba(255, 74, 74, 0.22);
+}
+
+.hp-row {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hp-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: #0f1116;
+  overflow: hidden;
+}
+
+.hp-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f87171, #facc15 45%, #4ade80);
+  background-size: 300px 100%;
+  transition: width 300ms ease;
+}
+
+.player-one .hp-fill {
+  background: linear-gradient(90deg, #0d8e98, #00c8d7);
+}
+
+.player-two .hp-fill {
+  background: linear-gradient(90deg, #9c2d2d, #ff4a4a);
+}
+
+.hp-value {
+  min-width: 52px;
+  text-align: right;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .eyebrow {
@@ -363,11 +414,11 @@ h1 {
 
 .stage-shell {
   position: relative;
+  background: #0b0e16;
   min-height: 0;
   height: calc(100vh - 28px);
   border-radius: 28px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.02);
   box-shadow: var(--shadow);
 }
 

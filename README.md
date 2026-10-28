@@ -4,23 +4,31 @@ Migracao do projeto original em C++ para uma versao web moderna com `HTML + CSS 
 
 ## Como executar
 
-No terminal, dentro de `c:\repos\batalha-urbana`, execute:
+No terminal, dentro de `c:eposatalha-urbana`, execute:
 
 ```powershell
-python -m http.server 8000
+node server.js
 ```
 
-Depois abra:
+Depois abra `http://127.0.0.1:8000`. O mesmo servidor entrega o jogo e as salas do modo LAN. Para parar, use `Ctrl + C`.
 
-`http://127.0.0.1:8000`
+## Como jogar
 
-Esse comando sobe um servidor web estatico local na porta `8000`. Ele e recomendado em vez de abrir o [index.html](/c:/repos/batalha-urbana/index.html) diretamente porque:
+Cada jogador começa a rodada com 100 HP. Vence a rodada quem destruir o carrinho adversário, e a partida vai para quem vencer 3 rodadas.
 
-- carrega os modulos JavaScript (`import/export`) em um ambiente web normal
-- evita problemas de caminho relativo e politicas do navegador ao abrir arquivos pelo disco
-- reproduz melhor o comportamento real da aplicacao
+| | Mira | Mover | Atirar |
+|---|---|---|---|
+| Player 1 | W/S | A/D | segure F e solte |
+| Player 2 | I/K | J/L | segure H e solte |
+| Jogador da vez (vs IA / LAN) | ↑/↓ | ←/→ | segure Espaço e solte |
 
-Para parar o servidor, use `Ctrl + C` no terminal.
+- **Força:** segurar o disparo enche a barra em vai-e-vem; soltar atira. A marca branca mostra a força do tiro anterior.
+- **Vento:** muda a cada turno e aparece no painel do topo (as nuvens também seguem o vento).
+- **Explosões:** causam dano em área (acerto direto dá bônus), inclusive em quem atirou.
+- **Cenário destrutível:** cada explosão abre uma cratera nos prédios. Carrinhos sem apoio caem, e quedas altas causam dano.
+- **Movimento:** cada turno tem combustível limitado (barra amarela sob o HP).
+- **Timer:** 20 s por turno. Se acabar durante a carga, o tiro sai com a força atual; senão, a vez passa.
+- **Atalhos:** `B` reinicia, `M` alterna IA/local, `N` muda a dificuldade da IA, `U` liga/desliga o som.
 
 ## Modo LAN
 
@@ -51,11 +59,15 @@ Observacoes:
 
 ## Estrutura
 
-- [src/game.js](/c:/repos/batalha-urbana/src/game.js): estado da partida, turnos, tiros, pontos e colisao.
-- [src/scene.js](/c:/repos/batalha-urbana/src/scene.js): desenho do cenario, carrinhos e trajetorias.
-- [src/renderer.js](/c:/repos/batalha-urbana/src/renderer.js): renderer Canvas e conversao de coordenadas.
-- [src/config.js](/c:/repos/batalha-urbana/src/config.js): constantes, spawns e caixas de colisao.
-- [src/math.js](/c:/repos/batalha-urbana/src/math.js): transformacoes geometricas reutilizaveis.
+- [src/game.js](/c:/repos/batalha-urbana/src/game.js): estado da partida, fases do turno, entrada, dano, quedas e IA. Não usa DOM, então roda também no `server.js`.
+- [src/physics.js](/c:/repos/batalha-urbana/src/physics.js): trajetória com vento, colisão com prédios/crateras e apoio dos carrinhos.
+- [src/scene.js](/c:/repos/batalha-urbana/src/scene.js): céu, cidade, carrinhos, projétil e painel do topo.
+- [src/renderer.js](/c:/repos/batalha-urbana/src/renderer.js): renderer Canvas, conversão de coordenadas e camadas em cache.
+- [src/effects.js](/c:/repos/batalha-urbana/src/effects.js): partículas, tremor de tela, textos de dano e banners (só no cliente).
+- [src/audio.js](/c:/repos/batalha-urbana/src/audio.js): efeitos sonoros sintetizados com WebAudio.
+- [src/hud.js](/c:/repos/batalha-urbana/src/hud.js) e [src/input.js](/c:/repos/batalha-urbana/src/input.js): painel lateral e teclado.
+- [src/config.js](/c:/repos/batalha-urbana/src/config.js): constantes de gameplay, temas, spawns e caixas de colisão.
+- [src/math.js](/c:/repos/batalha-urbana/src/math.js): transformações geométricas e utilitários.
 
 ## Regra importante da migracao
 

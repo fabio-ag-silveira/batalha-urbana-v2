@@ -1,76 +1,76 @@
-import { CART_SIZE, CITY_LAYOUT } from "./config.js";
-import { createCirclePoints, createRectPoints, degToRad, transformPoints } from "./math.js";
+import {
+  CART_SIZE,
+  CITY_LAYOUT,
+  FUEL_PER_TURN,
+  MAX_HP,
+  ROUNDS_TO_WIN,
+  SKY_THEMES,
+  TURN_TIME_MS,
+  WIND_MAX,
+} from "./config.js";
+import { createRectPoints, createRng, transformPoints } from "./math.js";
+import { getProjectileOrigin } from "./physics.js";
 
-function drawRect(renderer, left, bottom, right, top, fill, stroke = "#000000") {
-  renderer.drawPolygon(createRectPoints(left, bottom, right, top), { fill, stroke });
+const FONT = "'Trebuchet MS', 'Segoe UI', sans-serif";
+
+function drawRect(renderer, left, bottom, right, top, fill, stroke = "#000000", alpha = 1) {
+  renderer.drawPolygon(createRectPoints(left, bottom, right, top), { fill, stroke, alpha });
 }
 
 function drawWindow(renderer, centerX, centerY, color) {
   drawRect(renderer, centerX - 1.5, centerY - 1, centerX + 1.5, centerY + 1, color, "#111111");
 }
 
-function drawWindowWithOptions(renderer, centerX, centerY, color, options = {}) {
-  renderer.drawPolygon(
-    createRectPoints(centerX - 1.5, centerY - 1, centerX + 1.5, centerY + 1),
-    { fill: color, stroke: "#111111", ...options },
-  );
-}
-
 function drawDoor(renderer, centerX, centerY, color) {
   drawRect(renderer, centerX - 1, centerY - (CART_SIZE / 3), centerX + 1, centerY + (CART_SIZE / 3), color, "#111111");
 }
 
-function drawBuildingLarge(renderer, origin, scaleY = 1) {
-  drawRect(
-    renderer,
-    origin.x - 6,
-    origin.y - 14 * scaleY,
-    origin.x + 6,
-    origin.y + 14 * scaleY,
-    "#7a7a7a",
-  );
-
-  const rows = [11, 7, 3, -1, -5, -9].map((value) => origin.y + value * scaleY);
-  rows.forEach((rowY, index) => {
-    drawWindow(renderer, origin.x + 3, rowY, index % 2 === 0 ? "#f6e151" : "#f5f5ef");
-    drawWindow(renderer, origin.x - 3, rowY, index % 3 === 0 ? "#f6e151" : "#f5f5ef");
-  });
-  drawDoor(renderer, origin.x, origin.y - 10.5 * scaleY, "#f6e151");
+function pickWindowColor(theme, rng) {
+  return rng() < theme.litChance ? theme.windowLit : theme.windowDark;
 }
 
-function drawBuildingSmall(renderer, origin, scaleY = 1) {
-  drawRect(
-    renderer,
-    origin.x - 6,
-    origin.y - 14 * scaleY,
-    origin.x + 6,
-    origin.y + 10.5 * scaleY,
-    "#373737",
-  );
-
-  const rows = [7.5, 3.5, -0.5, -4.5, -8.5].map((value) => origin.y + value * scaleY);
-  rows.forEach((rowY, index) => {
-    drawWindow(renderer, origin.x + 3, rowY, index % 2 === 0 ? "#f5f5ef" : "#f6e151");
-    drawWindow(renderer, origin.x - 3, rowY, index % 3 === 0 ? "#f6e151" : "#f5f5ef");
-  });
-  drawDoor(renderer, origin.x, origin.y - 10.5 * scaleY, "#f6e151");
+function drawBuildingBody(renderer, origin, bottom, top, fill) {
+  drawRect(renderer, origin.x - 6, bottom, origin.x + 6, top, fill);
+  drawRect(renderer, origin.x + 3.2, bottom, origin.x + 6, top, "#000000", null, 0.2);
+  drawRect(renderer, origin.x - 6.6, top - 0.5, origin.x + 6.6, top + 0.8, fill);
+  drawRect(renderer, origin.x - 6.6, top + 0.3, origin.x + 6.6, top + 0.8, "#ffffff", null, 0.18);
 }
 
-function drawTower(renderer, origin) {
-  drawRect(renderer, origin.x - 6, origin.y - 14, origin.x + 6, origin.y + 14, "#0f0f0f");
-  renderer.drawPolygon(createCirclePoints({ x: origin.x, y: origin.y + 9 }, 3.75), {
-    fill: "#f6e151",
-    stroke: "#111111",
+function drawBuildingLarge(renderer, origin, scaleY, theme, rng) {
+  drawBuildingBody(renderer, origin, origin.y - 14 * scaleY, origin.y + 14 * scaleY, theme.buildings.large);
+  [11, 7, 3, -1, -5, -9].forEach((value) => {
+    const rowY = origin.y + value * scaleY;
+    drawWindow(renderer, origin.x + 3, rowY, pickWindowColor(theme, rng));
+    drawWindow(renderer, origin.x - 3, rowY, pickWindowColor(theme, rng));
   });
+  drawDoor(renderer, origin.x, origin.y - 10.5 * scaleY, theme.windowLit);
+}
+
+function drawBuildingSmall(renderer, origin, scaleY, theme, rng) {
+  drawBuildingBody(renderer, origin, origin.y - 14 * scaleY, origin.y + 10.5 * scaleY, theme.buildings.small);
+  [7.5, 3.5, -0.5, -4.5, -8.5].forEach((value) => {
+    const rowY = origin.y + value * scaleY;
+    drawWindow(renderer, origin.x + 3, rowY, pickWindowColor(theme, rng));
+    drawWindow(renderer, origin.x - 3, rowY, pickWindowColor(theme, rng));
+  });
+  drawDoor(renderer, origin.x, origin.y - 10.5 * scaleY, theme.windowLit);
+}
+
+function drawTower(renderer, origin, theme) {
+  drawRect(renderer, origin.x - 6, origin.y - 14, origin.x + 6, origin.y + 14, theme.buildings.tower);
+  drawRect(renderer, origin.x + 3.2, origin.y - 14, origin.x + 6, origin.y + 14, "#000000", null, 0.25);
+  renderer.drawEllipse({ x: origin.x, y: origin.y + 9 }, 3.75, { fill: theme.windowLit, stroke: "#111111" });
+  renderer.drawLine([{ x: origin.x, y: origin.y + 9 }, { x: origin.x, y: origin.y + 11.5 }], { stroke: "#111111", lineWidth: 1.5 });
+  renderer.drawLine([{ x: origin.x, y: origin.y + 9 }, { x: origin.x + 1.8, y: origin.y + 9 }], { stroke: "#111111", lineWidth: 1.5 });
   renderer.drawPolygon([
-    { x: origin.x - 6, y: origin.y + 14 },
+    { x: origin.x - 6.6, y: origin.y + 14 },
     { x: origin.x, y: origin.y + 20 },
-    { x: origin.x + 6, y: origin.y + 14 },
-  ], { fill: "#161616", stroke: "#111111" });
-  drawDoor(renderer, origin.x, origin.y - 12.5, "#f6e151");
+    { x: origin.x + 6.6, y: origin.y + 14 },
+  ], { fill: theme.buildings.tower, stroke: "#111111" });
+  drawDoor(renderer, origin.x, origin.y - 12.5, theme.windowLit);
 }
 
-function drawCitadel(renderer) {
+function drawCitadel(renderer, palette) {
   const stack = [{ sx: 0.5, sy: 2.5, tx: 0, ty: -5 }];
 
   const current = () => stack[stack.length - 1];
@@ -93,20 +93,20 @@ function drawCitadel(renderer) {
       y: transform.ty + transform.sy * point.y,
     };
   };
-  const drawPolygonWithTransform = (points, fill = "#090909", stroke = "#090909") => {
+  const drawPolygonWithTransform = (points, fill = palette.fill, stroke = palette.fill) => {
     renderer.drawPolygon(points.map(mapPoint), { fill, stroke, space: "view" });
   };
-  const drawPredioMaior = (fill = "#090909") => {
+  const drawPredioMaior = (fill = palette.fill) => {
     drawPolygonWithTransform(createRectPoints(-6, -14, 6, 14), fill);
   };
-  const drawJanela = (fill = "#090909") => {
+  const drawJanela = (fill = palette.fill) => {
     const mapped = [
       mapPoint({ x: -1.5, y: -1 }),
       mapPoint({ x: -1.5, y: 1 }),
       mapPoint({ x: 1.5, y: 1 }),
       mapPoint({ x: 1.5, y: -1 }),
     ];
-    renderer.drawPolygon(mapped, { fill, stroke: "#090909", space: "view" });
+    renderer.drawPolygon(mapped, { fill, stroke: palette.fill, space: "view" });
   };
   const withTransform = ({ scaleX = 1, scaleY = 1, translateX = 0, translateY = 0 }, draw) => {
     push();
@@ -116,7 +116,7 @@ function drawCitadel(renderer) {
     pop();
   };
   const drawWindowSequence = (steps) => {
-    steps.forEach(({ dx, dy, fill = "#090909" }) => {
+    steps.forEach(({ dx, dy, fill = palette.fill }) => {
       translate(dx, dy);
       drawJanela(fill);
     });
@@ -140,13 +140,13 @@ function drawCitadel(renderer) {
       { dx: 0, dy: 0 },
       { dx: -6, dy: 0 },
       { dx: 0, dy: -2 },
-      { dx: 6, dy: 0, fill: "#1a1a1a" },
+      { dx: 6, dy: 0, fill: palette.window },
       { dx: -6, dy: -2 },
-      { dx: 6, dy: 0, fill: "#1a1a1a" },
+      { dx: 6, dy: 0, fill: palette.window },
       { dx: -6, dy: -2 },
-      { dx: 6, dy: 0, fill: "#1a1a1a" },
+      { dx: 6, dy: 0, fill: palette.window },
       { dx: -6, dy: -2 },
-      { dx: 6, dy: 0, fill: "#1a1a1a" },
+      { dx: 6, dy: 0, fill: palette.window },
       { dx: -6, dy: -2 },
       { dx: 6, dy: 0 },
       { dx: -6, dy: -2 },
@@ -171,9 +171,9 @@ function drawCitadel(renderer) {
   withTransform({ translateX: -5, translateY: -2 }, () => {
     drawWindowSequence([
       { dx: 0, dy: 0 },
-      { dx: 6, dy: 0, fill: "#1a1a1a" },
+      { dx: 6, dy: 0, fill: palette.window },
       { dx: -6, dy: -2 },
-      { dx: 6, dy: 0, fill: "#1a1a1a" },
+      { dx: 6, dy: 0, fill: palette.window },
       { dx: -6, dy: -2 },
       { dx: 6, dy: 0 },
       { dx: 0, dy: -1 },
@@ -203,91 +203,355 @@ function drawCitadel(renderer) {
   });
 }
 
-function drawWheel(renderer, center, color) {
-  renderer.drawPolygon(createCirclePoints(center, 1.5), { fill: color, stroke: "#111111" });
+function screenEllipse(renderer, x, y, radiusX, radiusY, fill, alpha = 1) {
+  const context = renderer.context;
+  context.beginPath();
+  context.ellipse(x, y, radiusX, radiusY, 0, 0, Math.PI * 2);
+  context.globalAlpha = alpha;
+  context.fillStyle = fill;
+  context.fill();
+  context.globalAlpha = 1;
 }
 
-function buildCannonPolygon(player) {
-  const localBarrel = createRectPoints(-0.7, -3, 0.7, 3);
-  const pivot = { x: 0, y: 3 };
-  const translated = localBarrel.map((point) => ({ x: point.x, y: point.y + CART_SIZE }));
-  return transformPoints(translated, { x: player.position.x, y: player.position.y + pivot.y, rotation: player.angle });
+function drawSky(renderer, theme, time, cloudOffset) {
+  const { width, height } = renderer;
+  renderer.fillVerticalGradient(theme.sky, -40, height + 40);
+
+  if (theme.stars) {
+    const rng = createRng(1337);
+    for (let index = 0; index < 90; index += 1) {
+      const twinkle = 0.5 + 0.5 * Math.sin(time * (1.5 + rng() * 2) + index);
+      renderer.drawScreenCircle(rng() * width, rng() * height * 0.65, 0.5 + rng() * 1.1, {
+        fill: "#ffffff",
+        alpha: 0.25 + 0.6 * twinkle,
+      });
+    }
+  }
+
+  const bodyX = width * 0.8;
+  const bodyY = height * 0.17;
+  const bodyRadius = Math.min(width, height) * 0.045;
+  renderer.drawGlow(bodyX, bodyY, bodyRadius * 4.5, theme.body.glow);
+  renderer.drawScreenCircle(bodyX, bodyY, bodyRadius, { fill: theme.body.color });
+  if (theme.body.kind === "moon") {
+    renderer.drawScreenCircle(bodyX - bodyRadius * 0.3, bodyY - bodyRadius * 0.2, bodyRadius * 0.22, { fill: "#000000", alpha: 0.08 });
+    renderer.drawScreenCircle(bodyX + bodyRadius * 0.35, bodyY + bodyRadius * 0.3, bodyRadius * 0.15, { fill: "#000000", alpha: 0.08 });
+  }
+
+  const rng = createRng(4242);
+  const span = width + 360;
+  for (let index = 0; index < 7; index += 1) {
+    const scale = 0.6 + rng() * 0.9;
+    const baseX = rng() * span;
+    const y = height * (0.08 + rng() * 0.38);
+    const x = ((((baseX + cloudOffset * (0.5 + scale * 0.5)) % span) + span) % span) - 180;
+    screenEllipse(renderer, x, y, 42 * scale, 14 * scale, theme.cloud);
+    screenEllipse(renderer, x + 26 * scale, y - 9 * scale, 30 * scale, 15 * scale, theme.cloud);
+    screenEllipse(renderer, x - 28 * scale, y + 2 * scale, 26 * scale, 10 * scale, theme.cloud);
+    screenEllipse(renderer, x + 52 * scale, y + 3 * scale, 24 * scale, 9 * scale, theme.cloud);
+  }
 }
 
-export function getProjectileOrigin(player) {
-  const muzzleDistance = 6.5;
-  const rotation = degToRad(player.angle);
-
-  return {
-    x: player.position.x + Math.cos(rotation) * 0 - Math.sin(rotation) * muzzleDistance,
-    y: player.position.y + 3 + Math.sin(rotation) * 0 + Math.cos(rotation) * muzzleDistance,
-  };
+function drawBackdrop(renderer, state, theme) {
+  renderer.drawLayer("backdrop", `${state.seed}:${state.theme}`, () => {
+    const rng = createRng(state.seed ^ 0x5bd1e995);
+    let x = -42;
+    while (x < 42) {
+      const width = 2 + rng() * 4;
+      const top = -35 + rng() * 15;
+      renderer.drawPolygon(createRectPoints(x, -40, x + width, top), { fill: theme.distant, space: "view", alpha: 0.85 });
+      if (rng() < 0.25) {
+        renderer.drawLine([{ x: x + width / 2, y: top }, { x: x + width / 2, y: top + 2.5 }], {
+          stroke: theme.distant,
+          lineWidth: 1.5,
+          space: "view",
+        });
+      }
+      x += width + rng() * 0.8;
+    }
+    const hazeTop = renderer.toScreen({ x: 0, y: -14 }, "view").y;
+    renderer.fillVerticalGradient(["rgba(0, 0, 0, 0)", theme.haze], hazeTop, renderer.height);
+    drawCitadel(renderer, theme.citadel);
+  });
 }
 
-function buildProjectileTrajectory(player) {
-  const speedY = player.velocity * Math.sin(degToRad(player.angle + 90));
-  const speedX = player.velocity * Math.cos(degToRad(player.angle + 90));
+function drawCity(renderer, state, theme) {
+  const lastCrater = state.craters[state.craters.length - 1];
+  const version = `${state.seed}:${state.theme}:${state.craters.length}:${lastCrater?.x ?? ""}`;
+
+  renderer.drawLayer("city", version, (context) => {
+    const rng = createRng(state.seed);
+    CITY_LAYOUT.forEach((building) => {
+      const origin = { x: building.x, y: building.y };
+      if (building.type === "large") {
+        drawBuildingLarge(renderer, origin, building.scaleY ?? 1, theme, rng);
+      } else if (building.type === "small") {
+        drawBuildingSmall(renderer, origin, building.scaleY ?? 1, theme, rng);
+      } else {
+        drawTower(renderer, origin, theme);
+      }
+    });
+
+    if (state.craters.length) {
+      // Primeiro queima a borda (so onde ha predio), depois recorta o buraco.
+      context.globalCompositeOperation = "source-atop";
+      state.craters.forEach((crater) => renderer.drawEllipse(crater, crater.r * 1.35, { fill: "rgba(28, 16, 8, 0.6)" }));
+      context.globalCompositeOperation = "destination-out";
+      state.craters.forEach((crater) => renderer.drawEllipse(crater, crater.r, { fill: "#000000" }));
+      context.globalCompositeOperation = "source-over";
+    }
+  });
+}
+
+function drawStreet(renderer, theme) {
+  drawRect(renderer, -420, -60, 420, -12.5, theme.street, null);
+  renderer.drawLine([{ x: -420, y: -12.5 }, { x: 420, y: -12.5 }], { stroke: theme.curb, lineWidth: 2 });
+}
+
+function buildCannonPolygon(player, recoil) {
+  const kick = recoil * 1.5;
+  const barrel = createRectPoints(-0.7, 0.5 - kick, 0.7, 6.5 - kick);
+  return transformPoints(barrel, { x: player.position.x, y: player.position.y + 3, rotation: player.angle });
+}
+
+function drawCart(renderer, player, recoil) {
+  const { x, y } = player.position;
+
+  renderer.drawPolygon(buildCannonPolygon(player, recoil), { fill: player.color, stroke: "#111111" });
+  drawRect(renderer, x - 2, y + 1, x + 2, y + 4.4, player.shade);
+  renderer.drawPolygon([
+    { x: x - 3.9, y: y - 1.4 },
+    { x: x - 3.4, y: y + 1.6 },
+    { x: x + 3.4, y: y + 1.6 },
+    { x: x + 3.9, y: y - 1.4 },
+  ], { fill: player.color, stroke: "#111111" });
+  drawRect(renderer, x - 3.2, y + 0.9, x + 3.2, y + 1.4, "#ffffff", null, 0.35);
+  drawRect(renderer, x - 3.8, y - 1.4, x + 3.8, y - 0.5, "#000000", null, 0.25);
+
+  [-1, 1].forEach((side) => {
+    const center = { x: x + side * CART_SIZE, y: y - 0.5 };
+    const spin = x / 1.5;
+    renderer.drawEllipse(center, 1.5, { fill: "#16181d", stroke: "#000000" });
+    renderer.drawEllipse(center, 0.65, { fill: player.shade });
+    renderer.drawLine([
+      { x: center.x - Math.cos(spin) * 1.2, y: center.y - Math.sin(spin) * 1.2 },
+      { x: center.x + Math.cos(spin) * 1.2, y: center.y + Math.sin(spin) * 1.2 },
+    ], { stroke: "#6b7280", lineWidth: 1 });
+  });
+
+  renderer.drawEllipse({ x, y: y + 3 }, 1.6, { fill: player.color, stroke: "#111111" });
+  renderer.drawEllipse({ x: x - 0.5, y: y + 3.6 }, 0.5, { fill: "#ffffff", alpha: 0.5 });
+}
+
+function drawAimGuide(renderer, player) {
   const origin = getProjectileOrigin(player);
-  const points = [];
-  const duration = Math.max(0.1, 4 * ((speedY * 2) / 9.81));
-
-  for (let time = 0; time <= duration; time += 0.1) {
-    points.push({
-      x: origin.x + speedX * time,
-      y: origin.y + speedY * time - (9.81 * time * time) / 2,
-    });
-  }
-
-  return points;
+  const radians = ((player.angle + 90) * Math.PI) / 180;
+  const end = { x: origin.x + Math.cos(radians) * 10, y: origin.y + Math.sin(radians) * 10 };
+  renderer.drawLine([origin, end], { stroke: "#ffffff", lineWidth: 1.5, alpha: 0.65, dash: [4, 5] });
 }
 
-export function drawScene(renderer, gameState) {
-  drawCitadel(renderer);
+function hpColor(hp) {
+  if (hp > 60) {
+    return "#4ade80";
+  }
+  return hp > 30 ? "#facc15" : "#f87171";
+}
 
-  CITY_LAYOUT.forEach((building) => {
-    const origin = { x: building.x, y: building.y };
-    if (building.type === "large") {
-      drawBuildingLarge(renderer, origin, building.scaleY ?? 1);
-      return;
-    }
-    if (building.type === "small") {
-      drawBuildingSmall(renderer, origin, building.scaleY ?? 1);
-      return;
-    }
-    drawTower(renderer, origin);
+function drawPointer(renderer, x, tipY, fill) {
+  const context = renderer.context;
+  context.beginPath();
+  context.moveTo(x, tipY);
+  context.lineTo(x - 7, tipY - 9);
+  context.lineTo(x + 7, tipY - 9);
+  context.closePath();
+  renderer.applyStyle({ fill, stroke: "rgba(0, 0, 0, 0.7)", lineWidth: 1.5 });
+}
+
+function drawPowerBar(renderer, player, charge, centerX, top) {
+  const width = 84;
+  const left = centerX - width / 2;
+  const gradient = renderer.context.createLinearGradient(left, 0, left + width, 0);
+  gradient.addColorStop(0, "#4ade80");
+  gradient.addColorStop(0.55, "#facc15");
+  gradient.addColorStop(1, "#ef4444");
+
+  renderer.drawRoundedRect(left - 2, top - 2, width + 4, 14, 6, { fill: "rgba(0, 0, 0, 0.65)" });
+  renderer.drawRoundedRect(left, top, Math.max(2, width * charge.power), 10, 5, { fill: gradient });
+  if (player.lastPower !== null) {
+    const markerX = left + width * player.lastPower;
+    renderer.drawRoundedRect(markerX - 1, top - 3, 2, 16, 1, { fill: "#ffffff" });
+  }
+  renderer.drawText(`${Math.round(charge.power * 100)}%`, centerX, top - 10, {
+    font: `700 12px ${FONT}`,
+    outline: "rgba(0, 0, 0, 0.7)",
+  });
+}
+
+function drawPlayerTag(renderer, player, { isCurrent, aiming, charge, time }) {
+  const anchor = renderer.toScreen({ x: player.position.x, y: player.position.y + 7 });
+  const barWidth = 54;
+  const top = anchor.y - 16;
+
+  renderer.drawText(player.label, anchor.x, top - 10, {
+    font: `700 11px ${FONT}`,
+    fill: "#ffffff",
+    outline: "rgba(0, 0, 0, 0.7)",
+  });
+  renderer.drawRoundedRect(anchor.x - barWidth / 2, top - 3, barWidth, 6, 3, { fill: "rgba(0, 0, 0, 0.6)" });
+  renderer.drawRoundedRect(anchor.x - barWidth / 2, top - 3, Math.max(0, (barWidth * player.hp) / MAX_HP), 6, 3, {
+    fill: hpColor(player.hp),
   });
 
-  gameState.players.forEach((player) => {
-    const bodyColor = player.hitTint[player.damage];
+  if (!isCurrent) {
+    return;
+  }
 
-    drawRect(
-      renderer,
-      player.position.x - CART_SIZE,
-      player.position.y - 1.5,
-      player.position.x + CART_SIZE,
-      player.position.y + 1.5,
-      bodyColor,
-    );
-
-    drawWheel(renderer, { x: player.position.x - CART_SIZE, y: player.position.y - 0.5 }, player.wheel);
-    drawWheel(renderer, { x: player.position.x + CART_SIZE, y: player.position.y - 0.5 }, player.wheel);
-
-    drawRect(renderer, player.position.x - 2, player.position.y + 1, player.position.x + 2, player.position.y + 5, bodyColor);
-    renderer.drawPolygon(buildCannonPolygon(player), { fill: player.accent, stroke: "#111111" });
-    renderer.drawPolygon(createCirclePoints({ x: player.position.x, y: player.position.y + 3 }, 1.5), {
-      fill: player.accent,
-      stroke: "#111111",
-    });
-
-    if (gameState.activeProjectile?.ownerId === player.id) {
-      renderer.drawLine(buildProjectileTrajectory(player), { stroke: player.accent, lineWidth: 1.25 });
-    }
-  });
-
-  if (gameState.activeProjectile) {
-    renderer.drawPolygon(createCirclePoints(gameState.activeProjectile.position, 1.5), {
-      fill: "#f5efe4",
-      stroke: "#111111",
+  if (aiming) {
+    renderer.drawRoundedRect(anchor.x - barWidth / 2, top + 5, barWidth, 3, 1.5, { fill: "rgba(0, 0, 0, 0.5)" });
+    renderer.drawRoundedRect(anchor.x - barWidth / 2, top + 5, (barWidth * player.fuel) / FUEL_PER_TURN, 3, 1.5, {
+      fill: "#ffd166",
     });
   }
+
+  if (aiming && charge.active) {
+    drawPowerBar(renderer, player, charge, anchor.x, top - 38);
+    return;
+  }
+
+  drawPointer(renderer, anchor.x, top - 22 + Math.sin(time * 6) * 3, player.color);
+}
+
+function drawProjectile(renderer, projectile) {
+  const screen = renderer.toScreen(projectile.position);
+  if (screen.y < 0) {
+    const context = renderer.context;
+    context.beginPath();
+    context.moveTo(screen.x, 6);
+    context.lineTo(screen.x - 6, 16);
+    context.lineTo(screen.x + 6, 16);
+    context.closePath();
+    renderer.applyStyle({ fill: "#fff7e6", stroke: "rgba(0, 0, 0, 0.6)" });
+    return;
+  }
+  renderer.drawGlow(screen.x, screen.y, 18, "rgba(255, 220, 150, 0.6)");
+  renderer.drawScreenCircle(screen.x, screen.y, 3.4, { fill: "#fff7e6", stroke: "#1a1a1a", lineWidth: 1 });
+}
+
+function drawScoreDots(renderer, x, y, score, color, label) {
+  renderer.drawText(label, x, y - 9, { font: `700 10px ${FONT}`, fill: color });
+  for (let index = 0; index < ROUNDS_TO_WIN; index += 1) {
+    const dotX = x + (index - (ROUNDS_TO_WIN - 1) / 2) * 14;
+    renderer.drawScreenCircle(dotX, y + 7, 5, {
+      fill: index < score ? color : "rgba(255, 255, 255, 0.1)",
+      stroke: "rgba(255, 255, 255, 0.25)",
+    });
+  }
+}
+
+function drawWindIndicator(renderer, wind, centerX, top) {
+  renderer.drawText("VENTO", centerX, top + 14, { font: `700 9px ${FONT}`, fill: "rgba(255, 255, 255, 0.6)" });
+  if (Math.abs(wind) < 0.05) {
+    renderer.drawText("calmo", centerX, top + 35, { font: `700 13px ${FONT}` });
+    return;
+  }
+
+  const direction = Math.sign(wind);
+  const length = 10 + (Math.abs(wind) / WIND_MAX) * 38;
+  const arrowY = top + 30;
+  const startX = centerX - (direction * length) / 2;
+  const endX = centerX + (direction * length) / 2;
+  const context = renderer.context;
+  context.beginPath();
+  context.moveTo(startX, arrowY);
+  context.lineTo(endX, arrowY);
+  renderer.applyStyle({ stroke: "#e0f2fe", lineWidth: 3 });
+  context.beginPath();
+  context.moveTo(endX + direction * 6, arrowY);
+  context.lineTo(endX - direction * 2, arrowY - 6);
+  context.lineTo(endX - direction * 2, arrowY + 6);
+  context.closePath();
+  renderer.applyStyle({ fill: "#e0f2fe" });
+  renderer.drawText(Math.abs(wind).toFixed(1), centerX, top + 45, {
+    font: `700 10px ${FONT}`,
+    fill: "rgba(255, 255, 255, 0.75)",
+  });
+}
+
+function drawTurnTimer(renderer, state, x, y, time) {
+  const aiming = state.phase === "aiming";
+  const fraction = aiming ? Math.max(0, state.turnTimeMs) / TURN_TIME_MS : 1;
+  const seconds = Math.ceil(Math.max(0, state.turnTimeMs) / 1000);
+  const urgent = aiming && seconds <= 5;
+  const context = renderer.context;
+
+  context.beginPath();
+  context.arc(x, y, 17, 0, Math.PI * 2);
+  renderer.applyStyle({ stroke: "rgba(255, 255, 255, 0.14)", lineWidth: 4 });
+  context.beginPath();
+  context.arc(x, y, 17, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * fraction);
+  renderer.applyStyle({
+    stroke: urgent ? "#f87171" : state.players[state.turnIndex].color,
+    lineWidth: 4,
+    alpha: aiming ? 1 : 0.35,
+  });
+
+  const pulse = urgent ? 1 + 0.12 * Math.sin(time * 14) : 1;
+  renderer.drawText(aiming ? String(seconds) : "–", x, y + 1, {
+    font: `700 ${Math.round(14 * pulse)}px ${FONT}`,
+    fill: urgent ? "#fca5a5" : "#ffffff",
+  });
+}
+
+function drawOverlay(renderer, state, time) {
+  const panelWidth = 340;
+  const left = renderer.width / 2 - panelWidth / 2;
+  const top = 12;
+  const [playerOne, playerTwo] = state.players;
+
+  renderer.drawRoundedRect(left, top, panelWidth, 54, 16, {
+    fill: "rgba(10, 12, 18, 0.62)",
+    stroke: "rgba(255, 255, 255, 0.1)",
+  });
+  drawScoreDots(renderer, left + 42, top + 24, state.totalScore[0], playerOne.color, "P1");
+  drawScoreDots(renderer, left + panelWidth - 42, top + 24, state.totalScore[1], playerTwo.color, "P2");
+  drawWindIndicator(renderer, state.wind, left + 138, top);
+  drawTurnTimer(renderer, state, left + 218, top + 27, time);
+}
+
+export function drawScene(renderer, state, effects, time) {
+  const theme = SKY_THEMES[state.theme] ?? SKY_THEMES.day;
+  const context = renderer.context;
+  const current = state.players[state.turnIndex];
+  const aiming = state.phase === "aiming";
+  const shake = effects.shakeOffset;
+
+  drawSky(renderer, theme, time, effects.cloudOffset);
+
+  context.save();
+  context.translate(shake.x, shake.y);
+  drawBackdrop(renderer, state, theme);
+  drawCity(renderer, state, theme);
+  drawStreet(renderer, theme);
+
+  state.players.forEach((player) => drawCart(renderer, player, effects.getRecoil(player.id)));
+  if (aiming) {
+    drawAimGuide(renderer, current);
+  }
+
+  effects.drawTrail(renderer, state);
+  if (state.projectile) {
+    drawProjectile(renderer, state.projectile);
+  }
+  effects.drawWorld(renderer);
+
+  state.players.forEach((player) => drawPlayerTag(renderer, player, {
+    isCurrent: player.id === current.id && (aiming || state.phase === "flying"),
+    aiming,
+    charge: state.charge,
+    time,
+  }));
+  context.restore();
+
+  drawOverlay(renderer, state, time);
+  effects.drawOverlay(renderer);
 }

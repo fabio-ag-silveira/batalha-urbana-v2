@@ -1,5 +1,3 @@
-import { GAME_MODES } from "./config.js";
-
 function createClientId() {
   if (globalThis.crypto?.randomUUID) {
     return globalThis.crypto.randomUUID();
@@ -19,6 +17,7 @@ export class LanClient {
     this.snapshot = null;
     this.pollTimer = null;
     this.roomListTimer = null;
+    this.commandQueue = Promise.resolve();
     this.clientId = window.sessionStorage.getItem("batalha_urbana_client_id") ?? createClientId();
     window.sessionStorage.setItem("batalha_urbana_client_id", this.clientId);
   }
@@ -74,16 +73,30 @@ export class LanClient {
     this.fetchRooms().catch(() => {});
   }
 
-  async sendCommand(command) {
+  // Comandos vao em fila para que "soltar" nunca chegue antes de "apertar".
+  sendCommand(command) {
     if (!this.connected) {
-      return false;
+      return Promise.resolve(false);
     }
 
-    await this.request(`/api/rooms/${this.roomId}/action`, {
+    const roomId = this.roomId;
+    const playerId = this.playerId;
+    const send = () => this.request(`/api/rooms/${roomId}/action`, {
       method: "POST",
-      body: JSON.stringify({ playerId: this.playerId, command }),
+      body: JSON.stringify({ playerId, command }),
+    }).catch((error) => {
+      // 409 = acao recusada (fora da vez); nao e erro de rede.
+      if (error.status !== 409) {
+        throw error;
+      }
     });
-    return true;
+    const result = this.commandQueue.then(send, send);
+    this.commandQueue = result.catch(() => {});
+    return result.then(() => true);
+  }
+
+  sendInput(control, pressed, cancel = false) {
+    return this.sendCommand({ type: "input", control, pressed, cancel });
   }
 
   startPolling() {
@@ -133,6 +146,7 @@ export class LanClient {
     const snapshot = await this.request(`/api/rooms/${this.roomId}/state`);
     this.snapshot = snapshot;
     this.onState(snapshot);
+    this.refreshStatus();
   }
 
   async fetchRooms() {
@@ -145,45 +159,9 @@ export class LanClient {
     return rooms;
   }
 
-  renderNetworkHud(snapshot) {
-    if (!snapshot) {
-      return;
-    }
-
-    const [playerOne, playerTwo] = snapshot.players;
-    const renderStats = (player, points) => `
-      <div class="stat-chip">
-        <span class="stat-label">Velocidade</span>
-        <span class="stat-value">${player.velocity} m/s</span>
-      </div>
-      <div class="stat-chip">
-        <span class="stat-label">Angulo</span>
-        <span class="stat-value">${player.angle + 90}</span>
-      </div>
-      <div class="stat-chip">
-        <span class="stat-label">Pontos</span>
-        <span class="stat-value">${points}</span>
-      </div>
-    `;
-
-    this.ui.roundLabel.textContent = `Rodada ${snapshot.round + 1}`;
-    this.ui.turnLabel.textContent = snapshot.pendingRoundResetMs > 0
-      ? "Fechando rodada..."
-      : `Vez de ${snapshot.players[snapshot.turnIndex].label}`;
-    this.ui.statusLabel.textContent = snapshot.status;
-    this.ui.playerOneStats.innerHTML = renderStats(playerOne, snapshot.totalScore[0]);
-    this.ui.playerTwoStats.innerHTML = renderStats(playerTwo, snapshot.totalScore[1]);
-    this.ui.modeButtons?.forEach((button) => {
-      button.classList.toggle("is-active", button.dataset.mode === GAME_MODES.lan);
-    });
-    this.ui.difficultyButtons?.forEach((button) => {
-      button.classList.remove("is-active");
-      button.disabled = true;
-    });
-    if (this.ui.connectionStatus) {
-      this.ui.connectionStatus.textContent = this.connected
-        ? `Conectado como Player ${this.playerId} na sala ${this.roomId}`
-        : "Nao conectado";
+  refreshStatus() {
+    if (this.connected) {
+      this.updateUiStatus(`Conectado como Player ${this.playerId} na sala ${this.roomId}`);
     }
     this.updateLanActionState();
   }
@@ -238,7 +216,9 @@ export class LanClient {
 
     if (!response.ok) {
       const payload = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-      throw new Error(payload.error ?? "Falha de rede.");
+      const error = new Error(payload.error ?? "Falha de rede.");
+      error.status = response.status;
+      throw error;
     }
 
     return response.json();

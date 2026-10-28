@@ -21,24 +21,9 @@ const MIME_TYPES = {
 
 const rooms = new Map();
 
-function createStubUi() {
-  return {
-    modeLabel: { textContent: "" },
-    difficultyLabel: { textContent: "" },
-    roundLabel: { textContent: "" },
-    turnLabel: { textContent: "" },
-    statusLabel: { textContent: "" },
-    playerOneStats: { innerHTML: "" },
-    playerTwoStats: { innerHTML: "" },
-    modeButtons: [],
-    difficultyButtons: [],
-  };
-}
-
 function createRoomState() {
-  const game = new Game(createStubUi());
+  const game = new Game();
   game.setMode(GAME_MODES.local);
-  game.resetRound();
   return {
     id: Math.random().toString(36).slice(2, 8).toUpperCase(),
     game,
@@ -229,10 +214,13 @@ const server = createServer(async (request, response) => {
   }
 });
 
+let lastTick = Date.now();
 setInterval(() => {
   const now = Date.now();
+  const deltaMs = now - lastTick;
+  lastTick = now;
   rooms.forEach((room, roomId) => {
-    room.game.update(16);
+    room.game.update(deltaMs);
     if (now - room.updatedAt > 1000 * 60 * 60 * 4) {
       rooms.delete(roomId);
     }
