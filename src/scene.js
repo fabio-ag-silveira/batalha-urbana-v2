@@ -5,16 +5,15 @@ import {
   MAX_HP,
   ROUND_MODIFIERS,
   ROUNDS_TO_WIN,
-  SEA_FLOOR_Y,
   SKY_THEMES,
+  STREET_Y,
   TURN_TIME_MS,
   VIEW_BOUNDS,
-  WATER_Y,
   WEAPONS,
   WIND_MAX,
 } from "./config.js";
 import { clamp, createRectPoints, createRng, transformPoints } from "./math.js";
-import { getProjectileOrigin, terrainHeightAt } from "./physics.js";
+import { findIslandAt, getProjectileOrigin, sampleIsland } from "./physics.js";
 import { getMap } from "./map.js";
 
 const FONT = "'Trebuchet MS', 'Segoe UI', sans-serif";
@@ -62,18 +61,19 @@ function drawBuildingSmall(renderer, origin, scaleY, theme, rng) {
   drawDoor(renderer, origin.x, origin.y - 10.5 * scaleY, theme.windowLit);
 }
 
-function drawTower(renderer, origin, theme) {
-  drawRect(renderer, origin.x - 6, origin.y - 14, origin.x + 6, origin.y + 14, theme.buildings.tower);
-  drawRect(renderer, origin.x + 3.2, origin.y - 14, origin.x + 6, origin.y + 14, "#000000", null, 0.25);
-  renderer.drawEllipse({ x: origin.x, y: origin.y + 9 }, 3.75, { fill: theme.windowLit, stroke: "#111111" });
-  renderer.drawLine([{ x: origin.x, y: origin.y + 9 }, { x: origin.x, y: origin.y + 11.5 }], { stroke: "#111111", lineWidth: 1.5 });
-  renderer.drawLine([{ x: origin.x, y: origin.y + 9 }, { x: origin.x + 1.8, y: origin.y + 9 }], { stroke: "#111111", lineWidth: 1.5 });
+function drawTower(renderer, origin, theme, scaleY = 1) {
+  const at = (value) => origin.y + value * scaleY;
+  drawRect(renderer, origin.x - 6, at(-14), origin.x + 6, at(14), theme.buildings.tower);
+  drawRect(renderer, origin.x + 3.2, at(-14), origin.x + 6, at(14), "#000000", null, 0.25);
+  renderer.drawEllipse({ x: origin.x, y: at(9) }, 3.75 * Math.min(1, scaleY * 1.1), { fill: theme.windowLit, stroke: "#111111" });
+  renderer.drawLine([{ x: origin.x, y: at(9) }, { x: origin.x, y: at(11.5) }], { stroke: "#111111", lineWidth: 1.5 });
+  renderer.drawLine([{ x: origin.x, y: at(9) }, { x: origin.x + 1.8, y: at(9) }], { stroke: "#111111", lineWidth: 1.5 });
   renderer.drawPolygon([
-    { x: origin.x - 6.6, y: origin.y + 14 },
-    { x: origin.x, y: origin.y + 20 },
-    { x: origin.x + 6.6, y: origin.y + 14 },
+    { x: origin.x - 6.6, y: at(14) },
+    { x: origin.x, y: at(20) },
+    { x: origin.x + 6.6, y: at(14) },
   ], { fill: theme.buildings.tower, stroke: "#111111" });
-  drawDoor(renderer, origin.x, origin.y - 12.5, theme.windowLit);
+  drawDoor(renderer, origin.x, at(-12.5), theme.windowLit);
 }
 
 function drawCitadel(renderer, palette) {
@@ -275,71 +275,138 @@ function drawBackdrop(renderer, state, theme) {
       }
       x += width + rng() * 0.8;
     }
-    drawCitadel(renderer, theme.citadel);
-    const context = renderer.context;
-    context.globalCompositeOperation = "source-atop";
-    context.globalAlpha = 0.45;
-    context.fillStyle = theme.sky[1];
-    context.fillRect(0, 0, renderer.width, renderer.height);
-    context.globalAlpha = 1;
-    context.globalCompositeOperation = "source-over";
     const hazeTop = renderer.toScreen({ x: 0, y: -14 }, "view").y;
     renderer.fillVerticalGradient(["rgba(0, 0, 0, 0)", theme.haze], hazeTop, renderer.height);
+    drawCitadel(renderer, theme.citadel);
   });
 }
 
-function drawBuildings(renderer, map, theme, rng) {
-  map.buildings.forEach((building) => {
-    const origin = { x: building.x, y: building.y };
-    if (building.type === "large") {
-      drawBuildingLarge(renderer, origin, building.scaleY, theme, rng);
-    } else if (building.type === "small") {
-      drawBuildingSmall(renderer, origin, building.scaleY, theme, rng);
-    } else {
-      drawTower(renderer, origin, theme);
+function drawBuilding(renderer, building, theme, rng) {
+  const origin = { x: building.x, y: building.y };
+  if (building.type === "large") {
+    drawBuildingLarge(renderer, origin, building.scaleY, theme, rng);
+  } else if (building.type === "small") {
+    drawBuildingSmall(renderer, origin, building.scaleY, theme, rng);
+  } else if (building.type === "tower") {
+    drawTower(renderer, origin, theme, building.scaleY);
+  } else {
+    drawColumn(renderer, building, rng);
+  }
+}
+
+// Coluna quebrada das ilhas de ruina: topo irregular.
+function drawColumn(renderer, column, rng) {
+  const { x, base, top } = column;
+  const crack = top - 0.6 - rng() * 1.2;
+  renderer.drawPolygon([
+    { x: x - 1.2, y: base },
+    { x: x - 1.2, y: top },
+    { x: x - 0.2, y: crack },
+    { x: x + 0.5, y: top - 0.3 },
+    { x: x + 1.2, y: crack + 0.4 },
+    { x: x + 1.2, y: base },
+  ], { fill: "#cfc6b6", stroke: "#3b352c", lineWidth: 1 });
+  renderer.drawPolygon(createRectPoints(x + 0.4, base, x + 1.2, crack), { fill: "#000000", alpha: 0.18 });
+  renderer.drawPolygon(createRectPoints(x - 1.6, base - 0.5, x + 1.6, base + 0.6), { fill: "#b7ad9b", stroke: "#3b352c", lineWidth: 1 });
+}
+
+function drawDecor(renderer, decor, theme) {
+  const { x, y, size, variant } = decor;
+  if (decor.kind === "pine") {
+    renderer.drawPolygon(createRectPoints(x - 0.35, y - 0.5, x + 0.35, y + size * 0.3), { fill: theme.trunk });
+    [0, 1, 2].forEach((tier) => {
+      const bottom = y + size * (0.2 + tier * 0.25);
+      const half = size * (0.38 - tier * 0.09);
+      renderer.drawPolygon([
+        { x: x - half, y: bottom },
+        { x, y: bottom + size * 0.42 },
+        { x: x + half, y: bottom },
+      ], { fill: tier % 2 ? theme.foliage : theme.grass, stroke: "rgba(0, 0, 0, 0.3)", lineWidth: 1 });
+    });
+  } else if (decor.kind === "tree") {
+    renderer.drawPolygon(createRectPoints(x - 0.4, y - 0.5, x + 0.4, y + size * 0.55), { fill: theme.trunk });
+    renderer.drawEllipse({ x, y: y + size * 0.85 }, size * 0.45, { fill: theme.foliage, stroke: "rgba(0, 0, 0, 0.3)", lineWidth: 1 });
+    renderer.drawEllipse({ x: x - size * 0.15, y: y + size * 0.95 }, size * 0.18, { fill: "#ffffff", alpha: 0.12 });
+  } else if (decor.kind === "bush") {
+    renderer.drawEllipse({ x, y: y + size * 0.4 }, size, { fill: theme.foliage, stroke: "rgba(0, 0, 0, 0.25)", lineWidth: 1 });
+  } else if (decor.kind === "rock") {
+    renderer.drawPolygon([
+      { x: x - size, y: y - 0.3 },
+      { x: x - size * 0.7, y: y + size * (0.6 + variant * 0.3) },
+      { x: x + size * 0.1, y: y + size * 0.9 },
+      { x: x + size * 0.8, y: y + size * 0.5 },
+      { x: x + size, y: y - 0.3 },
+    ], { fill: theme.rock, stroke: "rgba(0, 0, 0, 0.4)", lineWidth: 1 });
+  } else if (decor.kind === "crystal") {
+    const lean = (variant - 0.5) * 1.2;
+    renderer.drawPolygon([
+      { x: x - size * 0.22, y: y - 0.2 },
+      { x: x - size * 0.25 + lean, y: y + size * 0.6 },
+      { x: x + lean, y: y + size },
+      { x: x + size * 0.25 + lean, y: y + size * 0.6 },
+      { x: x + size * 0.22, y: y - 0.2 },
+    ], { fill: theme.crystal, stroke: "#ffffff", lineWidth: 1, alpha: 0.9 });
+  } else if (decor.kind === "root") {
+    const sway = (variant - 0.5) * 2;
+    renderer.drawLine([
+      { x, y },
+      { x: x + sway * 0.5, y: y - size * 0.5 },
+      { x: x + sway, y: y - size },
+    ], { stroke: theme.root, lineWidth: 1.5, alpha: 0.85 });
+  }
+}
+
+function drawFloatingIsland(renderer, island, theme, rng) {
+  const context = renderer.context;
+  const points = island.top.map((top, index) => ({ x: island.left + index * island.step, y: top }));
+  const underside = island.bottom.map((bottom, index) => ({ x: island.left + index * island.step, y: bottom })).reverse();
+
+  const top = renderer.toScreen({ x: 0, y: island.topY }).y;
+  const bottom = renderer.toScreen({ x: 0, y: island.bottomY }).y;
+  const gradient = context.createLinearGradient(0, top, 0, bottom);
+  gradient.addColorStop(0, theme.soil);
+  gradient.addColorStop(0.55, theme.rock);
+  gradient.addColorStop(1, "#1d1a1f");
+  renderer.drawPolygon([...points, ...underside], { fill: gradient, stroke: "rgba(0, 0, 0, 0.45)", lineWidth: 1.2 });
+
+  // Estratos de rocha acompanhando o topo.
+  [3, 6.5].forEach((depth) => {
+    const strata = points
+      .filter((point, index) => point.y - depth > island.bottom[index] + 1)
+      .map((point) => ({ x: point.x, y: point.y - depth }));
+    if (strata.length > 1) {
+      renderer.drawLine(strata, { stroke: "#000000", lineWidth: 1, alpha: 0.15 });
     }
   });
+
+  // Grama no topo; na ilha rochosa so em trechos.
+  const grassBand = [];
+  points.forEach((point, index) => {
+    const covered = island.type !== "rocky" || Math.floor(index / 6) % 3 === 0;
+    if (covered) {
+      grassBand.push(point);
+    } else if (grassBand.length) {
+      renderer.drawLine(grassBand.splice(0), { stroke: theme.grass, lineWidth: 3 * renderer.camera.zoom });
+    }
+  });
+  if (grassBand.length > 1) {
+    renderer.drawLine(grassBand, { stroke: theme.grass, lineWidth: 3 * renderer.camera.zoom });
+  }
+
+  island.decor.filter((decor) => decor.kind === "root").forEach((decor) => drawDecor(renderer, decor, theme));
+  island.buildings.forEach((building) => drawBuilding(renderer, building, theme, rng));
+  island.decor.filter((decor) => decor.kind !== "root").forEach((decor) => drawDecor(renderer, decor, theme));
 }
 
-// Ilhas (terreno + predios) numa camada cacheada; crateras recortadas como antes.
-function drawIslands(renderer, state, theme, map) {
+// Cidade e ilhas numa camada cacheada; crateras recortam tudo que e destrutivel.
+function drawWorld(renderer, state, theme, map) {
   const lastCrater = state.craters[state.craters.length - 1];
   const version = `${state.seed}:${state.theme}:${state.craters.length}:${lastCrater?.x ?? ""}:${renderer.cameraKey}`;
 
-  renderer.drawLayer("islands", version, (context) => {
-    const surface = map.heights.map((height, index) => ({ x: map.minX + index * map.step, y: height }));
-    const outline = [
-      { x: map.minX, y: SEA_FLOOR_Y - 30 },
-      ...surface,
-      { x: surface[surface.length - 1].x, y: SEA_FLOOR_Y - 30 },
-    ];
-    const top = renderer.toScreen({ x: 0, y: WATER_Y + 32 }).y;
-    const bottom = renderer.toScreen({ x: 0, y: WATER_Y - 2 }).y;
-    const gradient = context.createLinearGradient(0, top, 0, bottom);
-    gradient.addColorStop(0, theme.rock);
-    gradient.addColorStop(0.45, theme.soil);
-    gradient.addColorStop(0.82, theme.sand);
-    gradient.addColorStop(1, theme.sand);
-    renderer.drawPolygon(outline, { fill: gradient, stroke: "rgba(0, 0, 0, 0.35)", lineWidth: 1 });
-
-    // Grama so onde o terreno fica bem acima da agua.
-    let run = [];
-    const flushGrass = () => {
-      if (run.length > 1) {
-        renderer.drawLine(run, { stroke: theme.grass, lineWidth: 2.5 * renderer.camera.zoom });
-      }
-      run = [];
-    };
-    surface.forEach((point) => {
-      if (point.y > WATER_Y + 3) {
-        run.push(point);
-      } else {
-        flushGrass();
-      }
-    });
-    flushGrass();
-
-    drawBuildings(renderer, map, theme, createRng(state.seed));
+  renderer.drawLayer("world", version, (context) => {
+    const rng = createRng(state.seed);
+    map.city.buildings.forEach((building) => drawBuilding(renderer, building, theme, rng));
+    map.islands.forEach((island) => drawFloatingIsland(renderer, island, theme, rng));
 
     if (state.craters.length) {
       // Primeiro queima a borda (so onde ha solido), depois recorta o buraco.
@@ -352,48 +419,9 @@ function drawIslands(renderer, state, theme, map) {
   });
 }
 
-// Mar translucido por cima das ilhas: as praias somem naturalmente sob as ondas.
-function drawWater(renderer, theme, time) {
-  const context = renderer.context;
-  const { width, height } = renderer;
-  const { left, zoom } = renderer.camera;
-  const surfaceY = renderer.toScreen({ x: 0, y: WATER_Y }).y;
-  const visibleWidth = (VIEW_BOUNDS.maxX - VIEW_BOUNDS.minX) / zoom;
-  const amplitude = 1.5 + zoom;
-
-  const wave = (screenX, phase) => {
-    const viewX = left + (screenX / width) * visibleWidth;
-    return surfaceY + Math.sin(viewX * 0.9 + time * 1.6 + phase) * amplitude
-      + Math.sin(viewX * 0.37 - time * 0.9 + phase) * amplitude * 0.6;
-  };
-  const tracePath = (phase) => {
-    context.beginPath();
-    context.moveTo(-40, height + 40);
-    for (let x = -40; x <= width + 40; x += 12) {
-      context.lineTo(x, wave(x, phase));
-    }
-    context.lineTo(width + 40, height + 40);
-    context.closePath();
-  };
-
-  const gradient = context.createLinearGradient(0, surfaceY, 0, height);
-  gradient.addColorStop(0, theme.water);
-  gradient.addColorStop(1, theme.waterDeep);
-  tracePath(1.7);
-  renderer.applyStyle({ fill: theme.water, alpha: 0.35 });
-  tracePath(0);
-  renderer.applyStyle({ fill: gradient });
-
-  context.beginPath();
-  for (let x = -40; x <= width + 40; x += 12) {
-    const y = wave(x, 0);
-    if (x === -40) {
-      context.moveTo(x, y);
-    } else {
-      context.lineTo(x, y);
-    }
-  }
-  renderer.applyStyle({ stroke: theme.waterLine, lineWidth: 1.5 });
+function drawStreet(renderer, theme) {
+  drawRect(renderer, -420, -60, 420, -12.5, theme.street, null);
+  renderer.drawLine([{ x: -420, y: -12.5 }, { x: 420, y: -12.5 }], { stroke: theme.curb, lineWidth: 2 });
 }
 
 function buildCannonPolygon(player, pivot, recoil) {
@@ -405,19 +433,20 @@ function buildCannonPolygon(player, pivot, recoil) {
 // Inclinacao visual pelo relevo; em telhado ou no ar o carrinho fica reto.
 function cartTilt(player, map) {
   const { x, y } = player.position;
+  const island = findIslandAt(map, x);
   const onBuilding = [-2.5, 2.5].some((offset) => map.colliders.some((collider) =>
     Math.abs(collider.x - (x + offset)) <= collider.halfWidth &&
     Math.abs(collider.y + collider.halfHeight - (y - 2.5)) < 1.5));
-  if (player.falling || onBuilding) {
+  if (player.falling || onBuilding || !island || Math.abs(sampleIsland(island, x).top - (y - 2.5)) > 2) {
     return 0;
   }
-  const slope = (terrainHeightAt(map, x + 3) - terrainHeightAt(map, x - 3)) / 6;
-  return clamp((Math.atan(slope) * 180) / Math.PI, -30, 30);
+  const left = sampleIsland(island, Math.max(island.left, x - 3)).top;
+  const right = sampleIsland(island, Math.min(island.right, x + 3)).top;
+  return clamp((Math.atan((right - left) / 6) * 180) / Math.PI, -30, 30);
 }
 
 function drawCart(renderer, player, recoil, map) {
-  const sinkOffset = player.sunk ? 4 : 0;
-  const base = { x: player.position.x, y: player.position.y - sinkOffset };
+  const base = { x: player.position.x, y: player.position.y };
   const rotation = cartTilt(player, map);
   const place = (points) => transformPoints(points, { x: base.x, y: base.y, rotation });
   const placePoint = (x, y) => place([{ x, y }])[0];
@@ -500,7 +529,7 @@ function drawRain(renderer, wind, time) {
 }
 
 function drawFog(renderer, theme, time) {
-  const surfaceY = renderer.toScreen({ x: 0, y: WATER_Y }).y;
+  const surfaceY = renderer.toScreen({ x: 0, y: STREET_Y }).y;
   renderer.fillVerticalGradient(["rgba(0, 0, 0, 0)", theme.fog, theme.fog], surfaceY - renderer.height * 0.45, renderer.height + 40);
   const rng = createRng(77);
   for (let index = 0; index < 6; index += 1) {
@@ -738,10 +767,10 @@ export function drawScene(renderer, state, effects, time) {
   context.save();
   context.translate(shake.x, shake.y);
   drawBackdrop(renderer, state, theme);
-  drawIslands(renderer, state, theme, map);
+  drawWorld(renderer, state, theme, map);
+  drawStreet(renderer, theme);
   state.crates.forEach((crate) => drawCrate(renderer, crate, time));
   state.players.forEach((player) => drawCart(renderer, player, effects.getRecoil(player.id), map));
-  drawWater(renderer, theme, time);
   if (state.modifier === "fog") {
     drawFog(renderer, theme, time);
   }
@@ -753,7 +782,7 @@ export function drawScene(renderer, state, effects, time) {
   state.projectiles.forEach((projectile) => drawProjectile(renderer, projectile));
   effects.drawWorld(renderer);
 
-  state.players.filter((player) => !player.sunk).forEach((player) => drawPlayerTag(renderer, player, {
+  state.players.forEach((player) => drawPlayerTag(renderer, player, {
     isCurrent: player.id === current.id && (aiming || state.phase === "flying"),
     aiming,
     charge: state.charge,

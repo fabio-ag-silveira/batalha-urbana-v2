@@ -1,6 +1,5 @@
 import { CRATES, ROUND_MODIFIERS, WEAPONS } from "./config.js";
 
-const SPLASH_COLORS = ["#e0f2fe", "#93c5fd", "#ffffff"];
 
 const FONT = "'Trebuchet MS', 'Segoe UI', sans-serif";
 const MAX_PARTICLES = 450;
@@ -82,12 +81,6 @@ export class Effects {
       case "explosion": {
         // Tudo escala com o raio: fragmentos sao estalos, o pesado sacode a tela.
         const scale = event.radius / WEAPONS.standard.radius;
-        if (event.water) {
-          this.splash(event, scale);
-          this.addShake(5 * scale);
-          sound?.splash(scale);
-          break;
-        }
         this.rings.push({ x: event.x, y: event.y, radius: event.radius, life: 0.45, maxLife: 0.45 });
         this.flashes.push({ x: event.x, y: event.y, life: 0.2, maxLife: 0.2, radius: 70 * scale });
         this.burst(event, {
@@ -104,21 +97,8 @@ export class Effects {
         break;
       }
       case "bounce":
-        if (event.water) {
-          this.splash(event, 0.4);
-        } else {
-          this.burst(event, { count: 6, colors: ["#86efac", "#ffffff"], speed: 25, life: 0.3, size: 0.7, gravity: 30 });
-        }
+        this.burst(event, { count: 6, colors: ["#86efac", "#ffffff"], speed: 25, life: 0.3, size: 0.7, gravity: 30 });
         sound?.bounce();
-        break;
-      case "sink":
-        this.splash(event, 1.4);
-        this.burst({ x: event.x, y: event.y - 2 }, {
-          count: 14, colors: ["#bfdbfe", "#ffffff"], speed: 6, life: 1.6, size: 0.8, gravity: -14, alpha: 0.7,
-        });
-        this.showBanner(`${event.label} afundou!`, { color: "#93c5fd", duration: 2 });
-        this.addShake(6);
-        sound?.sink();
         break;
       case "crateDrop":
         this.texts.push({ x: event.x, y: CRATES.spawnY - 6, text: "Suprimento!", color: "#fde68a", size: 13, life: 1.6, maxLife: 1.6 });
@@ -133,11 +113,7 @@ export class Effects {
         break;
       }
       case "crateLost":
-        if (event.reason === "water") {
-          this.splash(event, 0.5);
-        } else {
-          this.burst(event, { count: 10, colors: ["#9a6b3c", "#5b3d1f"], speed: 35, life: 0.9, size: 0.8, gravity: 90, lift: 15 });
-        }
+        this.burst(event, { count: 10, colors: ["#9a6b3c", "#5b3d1f"], speed: 35, life: 0.9, size: 0.8, gravity: 90, lift: 15 });
         break;
       case "split":
         this.flashes.push({ x: event.x, y: event.y, life: 0.12, maxLife: 0.12, radius: 30 });
@@ -205,14 +181,6 @@ export class Effects {
     }
   }
 
-  // Coluna de agua para cima, sem fogo nem detrito.
-  splash(origin, scale) {
-    this.rings.push({ x: origin.x, y: origin.y, radius: 10 * scale, life: 0.5, maxLife: 0.5, color: "#e0f2fe" });
-    this.burst(origin, {
-      count: Math.round(22 * scale), colors: SPLASH_COLORS, speed: 18 * scale, life: 0.9, size: 0.9, gravity: 70, lift: 35 * scale, alpha: 0.85,
-    });
-  }
-
   update(dt, state) {
     this.cloudOffset += (6 + (state?.wind ?? 0) * 35) * dt;
 
@@ -267,7 +235,7 @@ export class Effects {
 
   emitDamageSmoke(dt, state) {
     state.players.forEach((player) => {
-      if (player.hp >= 50 || player.sunk) {
+      if (player.hp >= 50) {
         return;
       }
       const interval = player.hp <= 0 ? 0.06 : player.hp < 25 ? 0.12 : 0.25;

@@ -5,8 +5,8 @@ import {
   PLAYER_HITBOX,
   POWER_MAX_VELOCITY,
   POWER_MIN_VELOCITY,
-  SEA_FLOOR_Y,
-  WATER_Y,
+  FIXED_COLLIDERS,
+  STREET_Y,
 } from "./config.js";
 import { clamp, degToRad, isPointInsideRect } from "./math.js";
 
@@ -55,34 +55,48 @@ export function angleToAim(angle) {
   return { facing, elevation: facing > 0 ? angle + 90 : 90 - angle };
 }
 
-// Altura do terreno por interpolacao linear das amostras do mapa; fora dele e fundo do mar.
-export function terrainHeightAt(map, x) {
-  const position = (x - map.minX) / map.step;
-  const index = Math.floor(position);
-  if (index < 0 || index >= map.heights.length - 1) {
-    return SEA_FLOOR_Y;
+// Topo e fundo de uma ilha em x (curvas amostradas a cada island.step); null fora dela.
+export function sampleIsland(island, x) {
+  if (x < island.left || x > island.right) {
+    return null;
   }
+  const position = (x - island.left) / island.step;
+  const index = Math.min(Math.floor(position), island.top.length - 2);
   const fraction = position - index;
-  return map.heights[index] + (map.heights[index + 1] - map.heights[index]) * fraction;
+  return {
+    top: island.top[index] + (island.top[index + 1] - island.top[index]) * fraction,
+    bottom: island.bottom[index] + (island.bottom[index + 1] - island.bottom[index]) * fraction,
+  };
+}
+
+export function findIslandAt(map, x) {
+  return map.islands.find((island) => x >= island.left && x <= island.right) ?? null;
 }
 
 export function isInsideCrater(point, craters) {
   return craters.some((crater) => Math.hypot(point.x - crater.x, point.y - crater.y) <= crater.r);
 }
 
-// Terreno e predios sao solidos, menos onde as explosoes abriram crateras.
-export function isSolid(point, map, craters = []) {
-  const insideGround = point.y <= terrainHeightAt(map, point.x)
-    || map.colliders.some((collider) => isPointInsideRect(point, collider));
-  return insideGround && !isInsideCrater(point, craters);
+function isInsideIsland(point, map) {
+  return map.islands.some((island) => {
+    const sample = sampleIsland(island, point.x);
+    return sample !== null && point.y <= sample.top && point.y >= sample.bottom;
+  });
 }
 
-export function isInWater(point) {
-  return point.y <= WATER_Y;
+// Solidos destrutiveis: predios da cidade, ilhas e o que ha sobre elas (menos crateras).
+export function isCartSolid(point, map, craters = []) {
+  const inside = map.colliders.some((collider) => isPointInsideRect(point, collider)) || isInsideIsland(point, map);
+  return inside && !isInsideCrater(point, craters);
+}
+
+// Para projeteis: tambem o chao da rua e as paredes laterais, que ignoram crateras.
+export function isSolid(point, map, craters = []) {
+  return FIXED_COLLIDERS.some((collider) => isPointInsideRect(point, collider)) || isCartSolid(point, map, craters);
 }
 
 export function isOutOfBounds(point) {
-  return point.x < -400 || point.x > 400;
+  return point.x < -400 || point.x > 400 || point.y < -50;
 }
 
 export function isInsidePlayerHitbox(point, player) {
@@ -98,34 +112,33 @@ export function getPlayerCenter(player) {
   return { x: player.position.x, y: player.position.y + 2 };
 }
 
-// O carrinho se apoia quando ha solido logo abaixo de alguma das rodas.
+// O carrinho se apoia na rua ou quando ha solido logo abaixo de alguma das rodas.
 export function isCartSupported(position, map, craters) {
+  if (position.y <= STREET_Y + 0.001) {
+    return true;
+  }
   return (
-    isSolid({ x: position.x - 2.5, y: position.y - 2.5 }, map, craters) ||
-    isSolid({ x: position.x + 2.5, y: position.y - 2.5 }, map, craters)
+    isCartSolid({ x: position.x - 2.5, y: position.y - 2.5 }, map, craters) ||
+    isCartSolid({ x: position.x + 2.5, y: position.y - 2.5 }, map, craters)
   );
 }
 
 function isCartEmbedded(position, map, craters) {
-  return [-3, 0, 3].some((offset) => isSolid({ x: position.x + offset, y: position.y - 1 }, map, craters));
+  return [-3, 0, 3].some((offset) => isCartSolid({ x: position.x + offset, y: position.y - 1 }, map, craters));
 }
 
-export function isCartSunk(position) {
-  return position.y - 2 <= WATER_Y;
-}
-
-// Busca de cima para baixo o primeiro ponto em que o carrinho fica apoiado.
-export function placeOnGround(x, map, craters = [], startY = WATER_Y + 90) {
-  for (let y = startY; y > WATER_Y; y -= 0.25) {
-    if (isCartSupported({ x, y }, map, craters)) {
-      return isCartSunk({ x, y }) ? null : y;
+// Busca de cima para baixo o primeiro ponto em que o carrinho fica apoiado (no pior caso, a rua).
+export function placeOnGround(x, map, craters = [], startY = 140) {
+  for (let y = startY; y > STREET_Y; y -= 0.25) {
+    if (isCartSupported({ x, y }, map, craters) && !isCartEmbedded({ x, y }, map, craters)) {
+      return y;
     }
   }
-  return null;
+  return STREET_Y;
 }
 
 // Move o carrinho seguindo o relevo: sobe rampas ate ~55 graus, desce ladeiras e
-// recusa paredes, rampas ingremes e qualquer passo que leve para dentro do mar.
+// para em paredes. Sair da borda de uma ilha e permitido: o carrinho cai.
 export function moveCartOnGround(position, dx, map, craters) {
   const x = position.x + dx;
   if (Math.abs(x) > CART_X_LIMIT) {
@@ -133,10 +146,10 @@ export function moveCartOnGround(position, dx, map, craters) {
   }
   const direction = Math.sign(dx);
   const edgeX = x + direction * CART_SIZE;
-  const wallAhead = map.colliders.some((collider) =>
-    isPointInsideRect({ x: edgeX, y: position.y + 1 }, collider) ||
-    isPointInsideRect({ x: edgeX, y: position.y + 3.5 }, collider));
-  if (wallAhead && !isInsideCrater({ x: edgeX, y: position.y + 1 }, craters)) {
+  const wallAhead = [position.y + 1, position.y + 3.5].some((y) =>
+    map.colliders.some((collider) => isPointInsideRect({ x: edgeX, y }, collider)) &&
+    !isInsideCrater({ x: edgeX, y }, craters));
+  if (wallAhead) {
     return null;
   }
 
@@ -153,14 +166,8 @@ export function moveCartOnGround(position, dx, map, craters) {
 
   let descended = 0;
   while (!isCartSupported({ x, y }, map, craters) && descended <= maxStep) {
-    y -= 0.1;
+    y = Math.max(STREET_Y, y - 0.1);
     descended += 0.1;
   }
-
-  const next = { x, y };
-  const supported = isCartSupported(next, map, craters);
-  if (next.y - 2 < WATER_Y + 1 || (!supported && terrainHeightAt(map, x) <= WATER_Y + 1)) {
-    return null;
-  }
-  return next;
+  return { x, y };
 }

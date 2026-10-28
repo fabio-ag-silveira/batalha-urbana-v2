@@ -1,13 +1,15 @@
-import { CITY_TRANSFORM, VIEW_BOUNDS, WATER_Y } from "./config.js";
+import { CITY_TRANSFORM, VIEW_BOUNDS } from "./config.js";
+import { getMap } from "./map.js";
 
 const VIEW_WIDTH = VIEW_BOUNDS.maxX - VIEW_BOUNDS.minX;
 const MAX_ZOOM = 2.4;
+// Abaixo de 1 a camera se afasta para caber ilhas altas em telas largas e baixas.
+const MIN_ZOOM = 0.55;
 const MARGIN_X = 9;
-const MARGIN_TOP = 7;
+// Espaco acima do ponto mais alto para nome, barra de HP e seta do carrinho.
+const MARGIN_TOP = 12;
 const STORAGE_KEY = "batalha_urbana_camera";
 const WIDE_PHASES = ["roundStart", "roundOver", "matchOver"];
-// Base do enquadramento: 10 unidades abaixo da agua, em coordenadas de view.
-const BOTTOM_VIEW = (WATER_Y - 10 + CITY_TRANSFORM.translateY) * CITY_TRANSFORM.scaleY;
 
 function toView(point) {
   return {
@@ -53,9 +55,30 @@ export class CameraController {
     }
   }
 
+  frame(points, viewHeight, maxZoom) {
+    const view = points.map(toView);
+    const minX = Math.min(...view.map((point) => point.x)) - MARGIN_X;
+    const maxX = Math.max(...view.map((point) => point.x)) + MARGIN_X;
+    const maxY = Math.max(...view.map((point) => point.y)) + MARGIN_TOP;
+    const zoomX = VIEW_WIDTH / Math.max(1, maxX - minX);
+    const zoomY = viewHeight / Math.max(1, maxY - VIEW_BOUNDS.minY);
+    return {
+      zoom: Math.min(maxZoom, Math.max(MIN_ZOOM, Math.min(zoomX, zoomY))),
+      centerX: (minX + maxX) / 2,
+    };
+  }
+
+  // Visao geral: o mapa inteiro, com todas as ilhas e os dois carrinhos.
+  overview(state, viewHeight) {
+    const points = [{ x: -200, y: 0 }, { x: 200, y: 0 }];
+    getMap(state.seed).islands.forEach((island) => points.push({ x: island.left, y: island.topY + 8 }));
+    state.players.forEach((player) => points.push({ x: player.position.x, y: player.position.y + 12 }));
+    return this.frame(points, viewHeight, 1);
+  }
+
   computeTarget(state, viewHeight) {
     if (!this.enabled || WIDE_PHASES.includes(state.phase)) {
-      return { zoom: 1, centerX: 0 };
+      return this.overview(state, viewHeight);
     }
 
     const points = state.players.map((player) => ({ x: player.position.x, y: player.position.y + 12 }));
@@ -63,17 +86,7 @@ export class CameraController {
     if (this.focus) {
       points.push(this.focus);
     }
-
-    const view = points.map(toView);
-    const minX = Math.min(...view.map((point) => point.x)) - MARGIN_X;
-    const maxX = Math.max(...view.map((point) => point.x)) + MARGIN_X;
-    const maxY = Math.max(...view.map((point) => point.y)) + MARGIN_TOP;
-    const zoomX = VIEW_WIDTH / Math.max(1, maxX - minX);
-    const zoomY = viewHeight / Math.max(1, maxY - BOTTOM_VIEW);
-    return {
-      zoom: Math.min(MAX_ZOOM, Math.max(1, Math.min(zoomX, zoomY))),
-      centerX: (minX + maxX) / 2,
-    };
+    return this.frame(points, viewHeight, MAX_ZOOM);
   }
 
   update(dt, state, renderer) {
@@ -95,8 +108,11 @@ export class CameraController {
       this.centerX = target.centerX;
     }
 
+    // Com zoom menor que 1 a vista e mais larga que o mapa: centraliza.
     const visibleWidth = VIEW_WIDTH / this.zoom;
-    const left = Math.min(VIEW_BOUNDS.maxX - visibleWidth, Math.max(VIEW_BOUNDS.minX, this.centerX - visibleWidth / 2));
-    renderer.camera = { left, bottom: BOTTOM_VIEW, zoom: this.zoom };
+    const left = visibleWidth >= VIEW_WIDTH
+      ? -visibleWidth / 2
+      : Math.min(VIEW_BOUNDS.maxX - visibleWidth, Math.max(VIEW_BOUNDS.minX, this.centerX - visibleWidth / 2));
+    renderer.camera = { left, bottom: VIEW_BOUNDS.minY, zoom: this.zoom };
   }
 }

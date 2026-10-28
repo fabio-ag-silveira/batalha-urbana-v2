@@ -108,7 +108,8 @@ export const CART_GRAVITY = 70;
 // Velocidade do empurrao de uma explosao padrao no centro; escala com o raio da arma.
 export const KNOCKBACK = 28;
 export const SAFE_FALL = 10;
-export const CART_X_LIMIT = 200;
+export const CART_X_LIMIT = 194;
+export const STREET_Y = -16;
 export const PROJECTILE_SUBSTEP = 0.01;
 export const PHASE_DELAYS = {
   roundStart: 1600,
@@ -118,22 +119,50 @@ export const PHASE_DELAYS = {
   matchOver: 8000,
 };
 
-// Mar e arquipelago: o nivel da agua e o antigo nivel da rua, na base da camera.
-export const WATER_Y = -16;
-export const SEA_FLOOR_Y = -26;
-export const MAP_GEN = {
-  minX: -210,
-  maxX: 210,
-  usableMinX: -195,
-  usableMaxX: 195,
-  islandCount: [3, 4],
-  islandWidth: [60, 120],
-  channelWidth: [25, 45],
-  baseHeight: [6, 20],
-  maxHeight: 34,
-  buildingsPerIsland: [1, 3],
-  minSpawnDistance: 80,
+// Mapa procedural: cidade no chao (visual original) e ilhas flutuando no ceu.
+export const CITY_GEN = {
+  minX: -195,
+  maxX: 195,
+  buildingWidth: 12,
+  baseY: -20,
+  scaleY: [0.7, 1.35],
+  blockGap: [1, 3],
+  alleyGap: [14, 32],
+  minAlleys: 2,
+  minSpawnAlley: 16,
+  // Chance de abrir um beco depois de cada predio, por densidade da rodada.
+  densities: {
+    sparse: { label: "espaçada", alleyChance: 0.55, weight: 1 },
+    normal: { label: "normal", alleyChance: 0.3, weight: 2 },
+    dense: { label: "densa", alleyChance: 0.12, weight: 1 },
+  },
 };
+
+export const ISLAND_GEN = {
+  count: [3, 6],
+  width: [25, 75],
+  topY: [30, 115],
+  thickness: [10, 28],
+  minX: -185,
+  maxX: 185,
+  gapX: 12,
+  gapY: 22,
+  types: {
+    grove: { id: "grove", label: "Bosque", weight: 3 },
+    rocky: { id: "rocky", label: "Rochosa", weight: 2 },
+    village: { id: "village", label: "Vila", weight: 2 },
+    ruins: { id: "ruins", label: "Ruína", weight: 1.5 },
+  },
+  minSpawnDistance: 80,
+  islandSpawnPreference: 0.7,
+};
+
+// Chao da rua e paredes laterais: fixos, ignoram crateras.
+export const FIXED_COLLIDERS = [
+  { x: 205, y: -7.5, halfWidth: 7, halfHeight: 1500, kind: "wall" },
+  { x: -205, y: -7.5, halfWidth: 7, halfHeight: 1500, kind: "wall" },
+  { x: 0, y: -28, halfWidth: 1000, halfHeight: 15.5, kind: "ground" },
+];
 
 export const ROUND_MODIFIERS = {
   normal: { id: "normal", label: "Normal", weight: 4 },
@@ -147,7 +176,7 @@ export const CRATES = {
   dropChance: 0.35,
   firstTurn: 3,
   max: 2,
-  spawnY: 100,
+  spawnY: 150,
   parachuteSpeed: 9,
   freeFallSpeed: 35,
   pickupRadius: 6,
@@ -171,13 +200,15 @@ export const SKY_THEMES = {
     windowLit: "#f6e151",
     windowDark: "#d9dfe4",
     litChance: 0.25,
-    water: "rgba(38, 124, 186, 0.8)",
-    waterDeep: "#174a6e",
-    waterLine: "rgba(255, 255, 255, 0.6)",
-    sand: "#e3c78a",
-    soil: "#8b6b43",
-    rock: "#5d5248",
+    street: "#3b3d42",
+    curb: "#8d9096",
     grass: "#5fa34a",
+    soil: "#8b6b43",
+    rock: "#6b5d52",
+    foliage: "#3f8f3a",
+    trunk: "#5b3f26",
+    crystal: "#7dd3fc",
+    root: "#4a3a2a",
     fog: "rgba(220, 232, 238, 0.55)",
     stars: false,
   },
@@ -193,13 +224,15 @@ export const SKY_THEMES = {
     windowLit: "#ffd36b",
     windowDark: "#2a2430",
     litChance: 0.55,
-    water: "rgba(88, 66, 124, 0.82)",
-    waterDeep: "#2a1f45",
-    waterLine: "rgba(255, 200, 160, 0.5)",
-    sand: "#d8a878",
+    street: "#2b2830",
+    curb: "#7a6f7e",
+    grass: "#6f8f4a",
     soil: "#6e4b3a",
-    rock: "#463644",
-    grass: "#5b7a46",
+    rock: "#4e3c4c",
+    foliage: "#4f6f3a",
+    trunk: "#3f2a24",
+    crystal: "#f9a8d4",
+    root: "#3b2a2a",
     fog: "rgba(240, 190, 170, 0.45)",
     stars: false,
   },
@@ -215,13 +248,15 @@ export const SKY_THEMES = {
     windowLit: "#ffe27a",
     windowDark: "#141826",
     litChance: 0.75,
-    water: "rgba(18, 34, 74, 0.86)",
-    waterDeep: "#060b1c",
-    waterLine: "rgba(160, 190, 255, 0.4)",
-    sand: "#8c7f63",
+    street: "#15171f",
+    curb: "#3c4256",
+    grass: "#2f5a3a",
     soil: "#3d3328",
-    rock: "#2a2630",
-    grass: "#2f4d33",
+    rock: "#2a2636",
+    foliage: "#1f4a33",
+    trunk: "#2a1f18",
+    crystal: "#a5b4fc",
+    root: "#221a14",
     fog: "rgba(120, 140, 190, 0.4)",
     stars: true,
   },

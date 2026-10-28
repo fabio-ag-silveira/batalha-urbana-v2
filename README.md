@@ -24,7 +24,16 @@ A configuração fica em [wrangler.jsonc](/c:/repos/batalha-urbana/wrangler.json
 
 ## Como jogar
 
-Cada rodada acontece num **arquipélago novo**, gerado a partir de uma seed: 3 ou 4 ilhas com morros, praias e prédios. Cada jogador começa com 100 HP. Vence a rodada quem destruir o carrinho adversário **ou derrubá-lo no mar**, e a partida vai para quem vencer 3 rodadas.
+Cada rodada gera um **mapa novo** a partir de uma seed:
+
+- **Cidade:** a mesma do jogo original no visual, mas o arranjo muda. A densidade (espaçada, normal ou densa), a quantidade e a altura dos prédios e a largura dos becos variam a cada rodada.
+- **Ilhas flutuantes:** de 3 a 6 ilhas no céu, em alturas diferentes, de quatro tipos:
+  - **bosque:** pinheiros e árvores;
+  - **rochosa:** pedras e cristais;
+  - **vila:** casinhas;
+  - **ruína:** colunas quebradas.
+
+Os carrinhos podem nascer nas ilhas, nos telhados ou nos becos. Cada jogador começa com 100 HP. Vence a rodada quem destruir o carrinho adversário, e a partida vai para quem vencer 3 rodadas.
 
 | | Mira | Mover | Atirar | Arma |
 |---|---|---|---|---|
@@ -36,8 +45,8 @@ Cada rodada acontece num **arquipélago novo**, gerado a partir de uma seed: 3 o
 - **Vento:** muda a cada turno e aparece no painel do topo (as nuvens também seguem o vento).
 - **Explosões:** causam dano em área (acerto direto dá bônus), inclusive em quem atirou, e **empurram** o carrinho atingido para longe do impacto.
 - **Cenário destrutível:** cada explosão abre uma cratera no terreno e nos prédios. Carrinhos sem apoio caem, e quedas altas causam dano.
-- **Mar:** carrinho que cai na água afunda e perde a rodada. Tiros na água ferem, mas não abrem cratera; o Quicante ricocheteia na superfície.
-- **Movimento:** cada turno tem combustível limitado (barra amarela sob o HP). O carrinho sobe e desce encostas, mas não entra no mar dirigindo nem escala paredes.
+- **Quedas:** quem cai de uma ilha aterrissa na cidade e leva dano proporcional à altura (até 40). Derrubar o adversário de uma ilha alta, com crateras ou com o empurrão das explosões, é uma boa estratégia.
+- **Movimento:** cada turno tem combustível limitado (barra amarela sob o HP). O carrinho sobe e desce o relevo das ilhas e para em paredes. Andar além da borda de uma ilha faz o carrinho cair.
 - **Timer:** 20 s por turno. Se acabar durante a carga, o tiro sai com a força atual; senão, a vez passa.
 - **Armas especiais** (munição por rodada):
   - **✸ Fragmentação (×2):** explode e solta 4 fragmentos.
@@ -49,7 +58,7 @@ Cada rodada acontece num **arquipélago novo**, gerado a partir de uma seed: 3 o
   - **Gravidade baixa:** os tiros vão mais alto e mais longe.
   - **Neblina:** o indicador de vento some.
   - **Arsenal:** munição especial em dobro.
-- **Caixas de suprimento:** a partir do 3º turno, caixas podem cair de paraquedas sobre as ilhas: **vida** (+30 HP), **combustível** (+30) ou **munição** (+1 arma especial). Pega quem encostar o carrinho nela ou acertar um tiro que a atravesse. Explosões perto destroem a caixa, e a que cai no mar se perde.
+- **Caixas de suprimento:** a partir do 3º turno, caixas podem cair de paraquedas sobre as ilhas, os telhados ou a rua: **vida** (+30 HP), **combustível** (+30) ou **munição** (+1 arma especial). Pega quem encostar o carrinho nela ou acertar um tiro que a atravesse. Explosões perto destroem a caixa.
 - **Câmera dinâmica:** enquadra os dois carrinhos, segue o projétil e mostra o impacto. `C` (ou o botão no menu) alterna para a câmera fixa.
 - **Atalhos:** `B` reinicia, `M` alterna IA/local, `N` muda a dificuldade da IA, `U` liga/desliga o som, `C` troca a câmera.
 
@@ -62,9 +71,9 @@ Cada rodada acontece num **arquipélago novo**, gerado a partir de uma seed: 3 o
 ## Estrutura
 
 - [src/game.js](/c:/repos/batalha-urbana/src/game.js): estado da partida, fases do turno, entrada, dano, quedas e IA.
-- [src/map.js](/c:/repos/batalha-urbana/src/map.js): gerador do arquipélago (terreno, prédios e pontos de spawn) a partir da seed da rodada.
-- [src/physics.js](/c:/repos/batalha-urbana/src/physics.js): trajetória com vento e gravidade, colisão com terreno/prédios/crateras, água e movimento dos carrinhos.
-- [src/scene.js](/c:/repos/batalha-urbana/src/scene.js): céu, ilhas, mar, carrinhos, caixas, clima e painel do topo.
+- [src/map.js](/c:/repos/batalha-urbana/src/map.js): gerador do mapa a partir da seed da rodada: cidade procedural, ilhas flutuantes com conteúdo por tipo e pontos de spawn.
+- [src/physics.js](/c:/repos/batalha-urbana/src/physics.js): trajetória com vento e gravidade, colisão com rua/prédios/ilhas/crateras e movimento dos carrinhos.
+- [src/scene.js](/c:/repos/batalha-urbana/src/scene.js): céu, cidade, ilhas flutuantes, carrinhos, caixas, clima e painel do topo.
 - [src/renderer.js](/c:/repos/batalha-urbana/src/renderer.js): renderer Canvas, conversão de coordenadas e camadas em cache.
 - [src/camera.js](/c:/repos/batalha-urbana/src/camera.js): câmera dinâmica (zoom e acompanhamento), só no desenho.
 - [src/effects.js](/c:/repos/batalha-urbana/src/effects.js): partículas, tremor de tela, textos de dano e banners (só no cliente).
@@ -75,7 +84,7 @@ Cada rodada acontece num **arquipélago novo**, gerado a partir de uma seed: 3 o
 
 ## Coordenadas
 
-O mapa fixo do legado deu lugar ao arquipélago procedural, mas o jogo continua usando as `coordenadas de gameplay` do original. O nível do mar (`y = -16`) é o antigo nível da rua. O renderer converte para a tela com a mesma transformação do OpenGL antigo:
+O mapa fixo do legado deu lugar à cidade procedural com ilhas flutuantes, mas o jogo continua usando as `coordenadas de gameplay` do original. A rua fica em `y = -16`, e as ilhas flutuam entre `y = 30` e `y = 125`. O renderer converte para a tela com a mesma transformação do OpenGL antigo:
 
 - `xTela = xGameplay * 0.2`
 - `yTela = (yGameplay - 115) * 0.3`
