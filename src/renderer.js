@@ -14,6 +14,8 @@ export class CanvasRenderer {
     this.height = 0;
     this.pixelRatio = 1;
     this.viewHeight = VIEW_HEIGHT;
+    // Camera em coordenadas de view; so afeta o espaco "gameplay".
+    this.camera = { left: VIEW_BOUNDS.minX, bottom: VIEW_BOUNDS.minY, zoom: 1 };
     this.layers = new Map();
     this.resize();
   }
@@ -53,8 +55,11 @@ export class CanvasRenderer {
     const viewY = isGameplay
       ? (point.y + CITY_TRANSFORM.translateY) * CITY_TRANSFORM.scaleY
       : point.y;
-    const normalizedX = (viewX - VIEW_BOUNDS.minX) / VIEW_WIDTH;
-    const normalizedY = (viewY - VIEW_BOUNDS.minY) / this.viewHeight;
+    const zoom = isGameplay ? this.camera.zoom : 1;
+    const left = isGameplay ? this.camera.left : VIEW_BOUNDS.minX;
+    const bottom = isGameplay ? this.camera.bottom : VIEW_BOUNDS.minY;
+    const normalizedX = ((viewX - left) * zoom) / VIEW_WIDTH;
+    const normalizedY = ((viewY - bottom) * zoom) / this.viewHeight;
 
     return {
       x: normalizedX * this.width,
@@ -62,9 +67,16 @@ export class CanvasRenderer {
     };
   }
 
+  get cameraKey() {
+    const { left, zoom } = this.camera;
+    return `${left.toFixed(2)}:${zoom.toFixed(3)}`;
+  }
+
   unitsToPixels(units, space = "gameplay") {
-    const scaleX = space === "gameplay" ? CITY_TRANSFORM.scaleX : 1;
-    const scaleY = space === "gameplay" ? CITY_TRANSFORM.scaleY : 1;
+    const isGameplay = space === "gameplay";
+    const zoom = isGameplay ? this.camera.zoom : 1;
+    const scaleX = (isGameplay ? CITY_TRANSFORM.scaleX : 1) * zoom;
+    const scaleY = (isGameplay ? CITY_TRANSFORM.scaleY : 1) * zoom;
     return {
       x: (units * scaleX * this.width) / VIEW_WIDTH,
       y: (units * scaleY * this.height) / this.viewHeight,

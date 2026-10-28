@@ -26,11 +26,11 @@ A configuração fica em [wrangler.jsonc](/c:/repos/batalha-urbana/wrangler.json
 
 Cada jogador começa a rodada com 100 HP. Vence a rodada quem destruir o carrinho adversário, e a partida vai para quem vencer 3 rodadas.
 
-| | Mira | Mover | Atirar |
-|---|---|---|---|
-| Player 1 | W/S | A/D | segure F e solte |
-| Player 2 | I/K | J/L | segure H e solte |
-| Jogador da vez (vs IA) | ↑/↓ | ←/→ | segure Espaço e solte |
+| | Mira | Mover | Atirar | Arma |
+|---|---|---|---|---|
+| Player 1 | W/S | A/D | segure F e solte | Q |
+| Player 2 | I/K | J/L | segure H e solte | O |
+| Jogador da vez (vs IA) | ↑/↓ | ←/→ | segure Espaço e solte | Tab |
 
 - **Força:** segurar o disparo enche a barra em vai-e-vem; soltar atira. A marca branca mostra a força do tiro anterior.
 - **Vento:** muda a cada turno e aparece no painel do topo (as nuvens também seguem o vento).
@@ -38,12 +38,18 @@ Cada jogador começa a rodada com 100 HP. Vence a rodada quem destruir o carrinh
 - **Cenário destrutível:** cada explosão abre uma cratera nos prédios. Carrinhos sem apoio caem, e quedas altas causam dano.
 - **Movimento:** cada turno tem combustível limitado (barra amarela sob o HP).
 - **Timer:** 20 s por turno. Se acabar durante a carga, o tiro sai com a força atual; senão, a vez passa.
-- **Atalhos:** `B` reinicia, `M` alterna IA/local, `N` muda a dificuldade da IA, `U` liga/desliga o som.
+- **Armas especiais** (munição por rodada):
+  - **✸ Fragmentação (×2):** explode e solta 4 fragmentos.
+  - **◎ Quicante (×2):** quica até 2 vezes antes de explodir.
+  - **⬣ Pesado (×1):** explosão grande e cratera funda.
+  - O **● Canhão** comum é ilimitado. A IA também usa as especiais.
+- **Câmera dinâmica:** enquadra os dois carrinhos, segue o projétil e mostra o impacto. `C` (ou o botão no menu) alterna para a câmera fixa.
+- **Atalhos:** `B` reinicia, `M` alterna IA/local, `N` muda a dificuldade da IA, `U` liga/desliga o som, `C` troca a câmera.
 
 ### No celular ou tablet
 
 - Jogue com o aparelho **na horizontal**. Na vertical aparece um aviso, que pode ser dispensado.
-- Os botões na parte de baixo da tela fazem o mesmo que o teclado: ◀ ▶ movem, ▲ ▼ giram o canhão, e **ATIRAR** funciona segurando para carregar e soltando para disparar.
+- Os botões na parte de baixo da tela fazem o mesmo que o teclado: ◀ ▶ movem, **ARMA** troca a arma, ▲ ▼ giram o canhão, e **ATIRAR** funciona segurando para carregar e soltando para disparar.
 - O botão ☰ abre o menu (modo, dificuldade, som e nova partida), e ⛶ ativa a tela cheia nos navegadores que suportam.
 
 ## Estrutura
@@ -52,6 +58,7 @@ Cada jogador começa a rodada com 100 HP. Vence a rodada quem destruir o carrinh
 - [src/physics.js](/c:/repos/batalha-urbana/src/physics.js): trajetória com vento, colisão com prédios/crateras e apoio dos carrinhos.
 - [src/scene.js](/c:/repos/batalha-urbana/src/scene.js): céu, cidade, carrinhos, projétil e painel do topo.
 - [src/renderer.js](/c:/repos/batalha-urbana/src/renderer.js): renderer Canvas, conversão de coordenadas e camadas em cache.
+- [src/camera.js](/c:/repos/batalha-urbana/src/camera.js): câmera dinâmica (zoom e acompanhamento), só no desenho.
 - [src/effects.js](/c:/repos/batalha-urbana/src/effects.js): partículas, tremor de tela, textos de dano e banners (só no cliente).
 - [src/audio.js](/c:/repos/batalha-urbana/src/audio.js): efeitos sonoros sintetizados com WebAudio.
 - [src/hud.js](/c:/repos/batalha-urbana/src/hud.js) e [src/input.js](/c:/repos/batalha-urbana/src/input.js): painel lateral e teclado.

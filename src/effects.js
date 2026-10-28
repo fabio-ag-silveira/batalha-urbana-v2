@@ -1,3 +1,5 @@
+import { WEAPONS } from "./config.js";
+
 const FONT = "'Trebuchet MS', 'Segoe UI', sans-serif";
 const MAX_PARTICLES = 450;
 const MAX_TRAIL_POINTS = 90;
@@ -21,10 +23,7 @@ export class Effects {
     this.banner = null;
     this.shake = 0;
     this.shakeOffset = { x: 0, y: 0 };
-    this.trail = [];
-    this.trailId = null;
-    this.trailColor = "#ffffff";
-    this.trailFade = 0;
+    this.trails = new Map();
     this.recoil = new Map();
     this.smokeClock = new Map();
   }
@@ -78,20 +77,34 @@ export class Effects {
         this.addShake(2);
         sound?.shot(event.power);
         break;
-      case "explosion":
+      case "explosion": {
+        // Tudo escala com o raio: fragmentos sao estalos, o pesado sacode a tela.
+        const scale = event.radius / WEAPONS.standard.radius;
         this.rings.push({ x: event.x, y: event.y, radius: event.radius, life: 0.45, maxLife: 0.45 });
-        this.flashes.push({ x: event.x, y: event.y, life: 0.2, maxLife: 0.2, radius: 70 });
+        this.flashes.push({ x: event.x, y: event.y, life: 0.2, maxLife: 0.2, radius: 70 * scale });
         this.burst(event, {
-          count: 24, colors: ["#fff1a8", "#ffb347", "#ff6b35"], speed: 70, life: 0.55, size: 1.3, gravity: 40, drag: 1.5,
+          count: Math.round(24 * scale), colors: ["#fff1a8", "#ffb347", "#ff6b35"], speed: 70 * scale, life: 0.55, size: 1.3 * scale, gravity: 40, drag: 1.5,
         });
         this.burst(event, {
-          count: 14, colors: ["#6b6b6b", "#3d3d3d", "#8a7f72"], speed: 55, life: 1.3, size: 1, gravity: 130, lift: 25,
+          count: Math.round(14 * scale), colors: ["#6b6b6b", "#3d3d3d", "#8a7f72"], speed: 55 * scale, life: 1.3, size: 1, gravity: 130, lift: 25,
         });
         this.burst(event, {
-          count: 10, colors: ["#5b5b5b", "#7a7a7a", "#444444"], speed: 12, life: 1.8, size: 3, gravity: -8, grow: 3, drag: 1, alpha: 0.5,
+          count: Math.round(10 * scale), colors: ["#5b5b5b", "#7a7a7a", "#444444"], speed: 12, life: 1.8, size: 3 * scale, gravity: -8, grow: 3, drag: 1, alpha: 0.5,
         });
-        this.addShake(9);
-        sound?.explosion();
+        this.addShake(9 * scale * scale);
+        sound?.explosion(scale);
+        break;
+      }
+      case "bounce":
+        this.burst(event, { count: 6, colors: ["#86efac", "#ffffff"], speed: 25, life: 0.3, size: 0.7, gravity: 30 });
+        sound?.bounce();
+        break;
+      case "split":
+        this.flashes.push({ x: event.x, y: event.y, life: 0.12, maxLife: 0.12, radius: 30 });
+        sound?.split();
+        break;
+      case "weapon":
+        sound?.select();
         break;
       case "damage":
         this.texts.push({
@@ -195,7 +208,7 @@ export class Effects {
     }
 
     this.emitDamageSmoke(dt, state);
-    this.updateTrail(dt, state);
+    this.updateTrails(dt, state);
   }
 
   emitDamageSmoke(dt, state) {
@@ -220,41 +233,49 @@ export class Effects {
     });
   }
 
-  updateTrail(dt, state) {
-    const projectile = state.projectile;
-    if (!projectile) {
-      this.trailFade = Math.max(0, this.trailFade - dt * 2.5);
-      return;
-    }
-
-    if (projectile.id !== this.trailId) {
-      this.trailId = projectile.id;
-      this.trail = [];
-      this.trailColor = state.players.find((player) => player.id === projectile.ownerId)?.color ?? "#ffffff";
-    }
-    this.trailFade = 1;
-    const last = this.trail[this.trail.length - 1];
-    if (!last || Math.hypot(last.x - projectile.position.x, last.y - projectile.position.y) > 0.8) {
-      this.trail.push({ ...projectile.position });
-      if (this.trail.length > MAX_TRAIL_POINTS) {
-        this.trail.shift();
+  updateTrails(dt, state) {
+    const live = new Set();
+    state.projectiles.forEach((projectile) => {
+      live.add(projectile.id);
+      let trail = this.trails.get(projectile.id);
+      if (!trail) {
+        const owner = state.players.find((player) => player.id === projectile.ownerId);
+        const color = projectile.weapon === "standard" ? owner?.color : WEAPONS[projectile.weapon]?.color;
+        trail = { points: [], color: color ?? "#ffffff", fade: 1, width: projectile.weapon === "bomblet" ? 0.5 : 1 };
+        this.trails.set(projectile.id, trail);
       }
-    }
+      const last = trail.points[trail.points.length - 1];
+      if (!last || Math.hypot(last.x - projectile.position.x, last.y - projectile.position.y) > 0.8) {
+        trail.points.push({ ...projectile.position });
+        if (trail.points.length > MAX_TRAIL_POINTS) {
+          trail.points.shift();
+        }
+      }
+    });
+
+    this.trails.forEach((trail, id) => {
+      if (live.has(id)) {
+        return;
+      }
+      trail.fade -= dt * 2.5;
+      if (trail.fade <= 0) {
+        this.trails.delete(id);
+      }
+    });
   }
 
-  drawTrail(renderer) {
-    if (this.trailFade <= 0 || this.trail.length < 2) {
-      return;
-    }
-    const count = this.trail.length;
-    for (let index = 1; index < count; index += 1) {
-      const progress = index / count;
-      renderer.drawLine([this.trail[index - 1], this.trail[index]], {
-        stroke: this.trailColor,
-        lineWidth: 1 + progress * 3,
-        alpha: progress * 0.85 * this.trailFade,
-      });
-    }
+  drawTrails(renderer) {
+    this.trails.forEach((trail) => {
+      const count = trail.points.length;
+      for (let index = 1; index < count; index += 1) {
+        const progress = index / count;
+        renderer.drawLine([trail.points[index - 1], trail.points[index]], {
+          stroke: trail.color,
+          lineWidth: (1 + progress * 3) * trail.width,
+          alpha: progress * 0.85 * trail.fade,
+        });
+      }
+    });
   }
 
   drawWorld(renderer) {

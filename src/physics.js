@@ -21,6 +21,10 @@ export function projectileAt(origin, velocity, wind, time) {
   };
 }
 
+export function projectileVelocityAt(velocity, wind, time) {
+  return { x: velocity.x + wind * time, y: velocity.y - GRAVITY * time };
+}
+
 export function getProjectileOrigin(player) {
   const muzzleDistance = 6.5;
   const rotation = degToRad(player.angle);

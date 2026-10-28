@@ -10,6 +10,9 @@ const KEY_BINDINGS = {
   j: { player: 2, control: "left" },
   l: { player: 2, control: "right" },
   h: { player: 2, control: "fire" },
+  q: { player: 1, control: "weapon" },
+  o: { player: 2, control: "weapon" },
+  tab: { player: "current", control: "weapon" },
   arrowup: { player: "current", control: "up" },
   arrowdown: { player: "current", control: "down" },
   arrowleft: { player: "current", control: "left" },
@@ -17,7 +20,7 @@ const KEY_BINDINGS = {
   " ": { player: "current", control: "fire" },
 };
 
-const SHORTCUTS = ["b", "m", "n", "u"];
+const SHORTCUTS = ["b", "m", "n", "u", "c"];
 
 export class InputController {
   // resolveTarget(binding) decide no momento do aperto quem recebe a tecla;

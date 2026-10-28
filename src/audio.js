@@ -106,9 +106,21 @@ export class SoundBoard {
     this.tone({ type: "square", from: 180 + power * 120, to: 50, duration: 0.2, volume: 0.18 });
   }
 
-  explosion() {
-    this.noise({ duration: 0.9, volume: 0.8, filter: "lowpass", from: 1400, to: 120 });
-    this.tone({ type: "sine", from: 110, to: 30, duration: 0.6, volume: 0.5 });
+  explosion(scale = 1) {
+    this.noise({ duration: 0.5 + 0.4 * scale, volume: Math.min(1, 0.5 + 0.3 * scale), filter: "lowpass", from: 1000 + 400 * scale, to: 120 });
+    this.tone({ type: "sine", from: 130 - 20 * scale, to: 30, duration: 0.3 + 0.3 * scale, volume: Math.min(0.7, 0.5 * scale) });
+  }
+
+  bounce() {
+    this.tone({ type: "sine", from: 300, to: 520, duration: 0.12, volume: 0.18 });
+  }
+
+  split() {
+    this.noise({ duration: 0.15, volume: 0.3, filter: "bandpass", from: 1800, to: 900 });
+  }
+
+  select() {
+    this.tone({ type: "square", from: 660, to: 990, duration: 0.07, volume: 0.07 });
   }
 
   hit() {

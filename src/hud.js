@@ -1,4 +1,4 @@
-import { GAME_MODES, MAX_HP, ROUNDS_TO_WIN } from "./config.js";
+import { GAME_MODES, MAX_HP, ROUNDS_TO_WIN, WEAPONS } from "./config.js";
 
 const PHASE_LABELS = {
   roundStart: "Preparando a rodada...",
@@ -9,7 +9,8 @@ const PHASE_LABELS = {
 
 function renderStats(player, roundsWon) {
   const hpPercent = Math.max(0, (player.hp / MAX_HP) * 100);
-  const lastPower = player.lastPower === null ? "–" : `${Math.round(player.lastPower * 100)}%`;
+  const weapon = WEAPONS[player.weapon];
+  const ammo = player.ammo[player.weapon];
   return `
     <div class="hp-row">
       <div class="hp-bar"><span class="hp-fill" style="width: ${hpPercent}%"></span></div>
@@ -24,8 +25,8 @@ function renderStats(player, roundsWon) {
       <span class="stat-value">${Math.round(player.elevation)}°</span>
     </div>
     <div class="stat-chip">
-      <span class="stat-label">Últ. força</span>
-      <span class="stat-value">${lastPower}</span>
+      <span class="stat-label">Arma</span>
+      <span class="stat-value">${weapon.icon} ${weapon.label}${ammo === null ? "" : ` ×${ammo}`}</span>
     </div>
   `;
 }
@@ -45,7 +46,7 @@ export class Hud {
     apply(value);
   }
 
-  render(state, { mode, aiDifficulty, soundEnabled }) {
+  render(state, { mode, aiDifficulty, soundEnabled, cameraEnabled }) {
     const { ui } = this;
     const current = state.players[state.turnIndex];
     const winner = state.players.find((player) => player.id === state.matchWinner);
@@ -80,5 +81,11 @@ export class Hud {
         ui.soundButton.classList.toggle("is-active", value);
       }
     }, soundEnabled);
+    this.write("camera", (value) => {
+      if (ui.cameraButton) {
+        ui.cameraButton.textContent = value ? "Câmera: dinâmica" : "Câmera: fixa";
+        ui.cameraButton.classList.toggle("is-active", value);
+      }
+    }, cameraEnabled);
   }
 }

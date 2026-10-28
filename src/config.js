@@ -39,6 +39,7 @@ export const AI_PRESETS = {
     simulationStep: 0.08,
     aimJitter: { angle: 6, velocity: 5 },
     windKnowledge: 0.3,
+    specialChance: 0.2,
     candidatePool: 12,
     refinement: false,
   },
@@ -49,6 +50,7 @@ export const AI_PRESETS = {
     simulationStep: 0.06,
     aimJitter: { angle: 2, velocity: 2 },
     windKnowledge: 0.75,
+    specialChance: 0.4,
     candidatePool: 6,
     refinement: false,
   },
@@ -59,6 +61,7 @@ export const AI_PRESETS = {
     simulationStep: 0.04,
     aimJitter: { angle: 0, velocity: 0 },
     windKnowledge: 1,
+    specialChance: 0.6,
     candidatePool: 1,
     refinement: true,
   },
@@ -66,10 +69,31 @@ export const AI_PRESETS = {
 
 export const MAX_HP = 100;
 export const ROUNDS_TO_WIN = 3;
-export const EXPLOSION_RADIUS = 14;
-export const EXPLOSION_DAMAGE = 40;
-export const DIRECT_HIT_BONUS = 10;
-export const CRATER_RADIUS = 7;
+// ammo null = infinita. "split" gera fragmentos no impacto; "bounces" quica antes de explodir.
+export const WEAPONS = {
+  standard: {
+    id: "standard", label: "Canhão", icon: "●", ammo: null,
+    radius: 14, damage: 40, directBonus: 10, crater: 7, color: "#fff7e6", size: 3.4,
+  },
+  cluster: {
+    id: "cluster", label: "Fragmentação", icon: "✸", ammo: 2,
+    radius: 10, damage: 18, directBonus: 6, crater: 5, split: 4, color: "#ffb347", size: 3.8,
+  },
+  bounce: {
+    id: "bounce", label: "Quicante", icon: "◎", ammo: 2,
+    radius: 13, damage: 34, directBonus: 10, crater: 6, bounces: 2, color: "#86efac", size: 3.4,
+  },
+  heavy: {
+    id: "heavy", label: "Pesado", icon: "⬣", ammo: 1,
+    radius: 22, damage: 55, directBonus: 10, crater: 11, color: "#fca5a5", size: 4.8,
+  },
+  bomblet: {
+    id: "bomblet", label: "Fragmento", icon: "•", ammo: null,
+    radius: 9, damage: 15, directBonus: 4, crater: 4.5, color: "#ffd166", size: 2.2,
+  },
+};
+export const WEAPON_ORDER = ["standard", "cluster", "bounce", "heavy"];
+export const BOUNCE_RESTITUTION = 0.6;
 export const MAX_CRATERS = 160;
 export const WIND_MAX = 1.2;
 export const POWER_MIN_VELOCITY = 10;

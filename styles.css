@@ -413,6 +413,13 @@ body.touch .touch-controls {
   transform: scale(0.95);
 }
 
+.touch-weapon {
+  width: 72px;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: #ffd166;
+}
+
 .touch-fire {
   display: flex;
   flex-direction: column;

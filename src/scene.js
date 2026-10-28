@@ -6,6 +6,7 @@ import {
   ROUNDS_TO_WIN,
   SKY_THEMES,
   TURN_TIME_MS,
+  WEAPONS,
   WIND_MAX,
 } from "./config.js";
 import { createRectPoints, createRng, transformPoints } from "./math.js";
@@ -277,7 +278,7 @@ function drawBackdrop(renderer, state, theme) {
 
 function drawCity(renderer, state, theme) {
   const lastCrater = state.craters[state.craters.length - 1];
-  const version = `${state.seed}:${state.theme}:${state.craters.length}:${lastCrater?.x ?? ""}`;
+  const version = `${state.seed}:${state.theme}:${state.craters.length}:${lastCrater?.x ?? ""}:${renderer.cameraKey}`;
 
   renderer.drawLayer("city", version, (context) => {
     const rng = createRng(state.seed);
@@ -387,6 +388,21 @@ function drawPowerBar(renderer, player, charge, centerX, top) {
   });
 }
 
+function formatWeapon(player) {
+  const weapon = WEAPONS[player.weapon];
+  const ammo = player.ammo[player.weapon];
+  return `${weapon.icon} ${weapon.label}${ammo === null ? "" : ` ×${ammo}`}`;
+}
+
+function drawWeaponLabel(renderer, player, centerX, y) {
+  const weapon = WEAPONS[player.weapon];
+  renderer.drawText(formatWeapon(player), centerX, y, {
+    font: `700 11px ${FONT}`,
+    fill: weapon.id === "standard" ? "rgba(255, 255, 255, 0.8)" : weapon.color,
+    outline: "rgba(0, 0, 0, 0.75)",
+  });
+}
+
 function drawPlayerTag(renderer, player, { isCurrent, aiming, charge, time }) {
   const anchor = renderer.toScreen({ x: player.position.x, y: player.position.y + 7 });
   const barWidth = 54;
@@ -411,6 +427,7 @@ function drawPlayerTag(renderer, player, { isCurrent, aiming, charge, time }) {
     renderer.drawRoundedRect(anchor.x - barWidth / 2, top + 5, (barWidth * player.fuel) / FUEL_PER_TURN, 3, 1.5, {
       fill: "#ffd166",
     });
+    drawWeaponLabel(renderer, player, anchor.x, top - 64);
   }
 
   if (aiming && charge.active) {
@@ -422,6 +439,7 @@ function drawPlayerTag(renderer, player, { isCurrent, aiming, charge, time }) {
 }
 
 function drawProjectile(renderer, projectile) {
+  const weapon = WEAPONS[projectile.weapon] ?? WEAPONS.standard;
   const screen = renderer.toScreen(projectile.position);
   if (screen.y < 0) {
     const context = renderer.context;
@@ -430,11 +448,15 @@ function drawProjectile(renderer, projectile) {
     context.lineTo(screen.x - 6, 16);
     context.lineTo(screen.x + 6, 16);
     context.closePath();
-    renderer.applyStyle({ fill: "#fff7e6", stroke: "rgba(0, 0, 0, 0.6)" });
+    renderer.applyStyle({ fill: weapon.color, stroke: "rgba(0, 0, 0, 0.6)" });
     return;
   }
-  renderer.drawGlow(screen.x, screen.y, 18, "rgba(255, 220, 150, 0.6)");
-  renderer.drawScreenCircle(screen.x, screen.y, 3.4, { fill: "#fff7e6", stroke: "#1a1a1a", lineWidth: 1 });
+  const size = weapon.size * Math.min(1.6, Math.sqrt(renderer.camera.zoom));
+  renderer.drawGlow(screen.x, screen.y, size * 5.5, "rgba(255, 220, 150, 0.6)");
+  renderer.drawScreenCircle(screen.x, screen.y, size, { fill: weapon.color, stroke: "#1a1a1a", lineWidth: 1 });
+  if (weapon.id === "heavy") {
+    renderer.drawScreenCircle(screen.x, screen.y, size * 0.45, { fill: "#7f1d1d" });
+  }
 }
 
 function drawScoreDots(renderer, x, y, score, color, label) {
@@ -538,10 +560,8 @@ export function drawScene(renderer, state, effects, time) {
     drawAimGuide(renderer, current);
   }
 
-  effects.drawTrail(renderer, state);
-  if (state.projectile) {
-    drawProjectile(renderer, state.projectile);
-  }
+  effects.drawTrails(renderer);
+  state.projectiles.forEach((projectile) => drawProjectile(renderer, projectile));
   effects.drawWorld(renderer);
 
   state.players.forEach((player) => drawPlayerTag(renderer, player, {

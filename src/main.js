@@ -6,6 +6,7 @@ import { Effects } from "./effects.js";
 import { SoundBoard } from "./audio.js";
 import { Hud } from "./hud.js";
 import { InputController } from "./input.js";
+import { CameraController } from "./camera.js";
 
 const canvas = document.getElementById("gameCanvas");
 const renderer = new CanvasRenderer(canvas);
@@ -21,6 +22,7 @@ const ui = {
   modeButtons: Array.from(document.querySelectorAll("[data-mode]")),
   difficultyButtons: Array.from(document.querySelectorAll("[data-difficulty]")),
   soundButton: document.getElementById("soundButton"),
+  cameraButton: document.getElementById("cameraButton"),
   resetButton: document.getElementById("resetButton"),
   menuButton: document.getElementById("menuButton"),
   menuClose: document.getElementById("menuClose"),
@@ -34,6 +36,7 @@ const game = new Game();
 const hud = new Hud(ui);
 const effects = new Effects();
 const sound = new SoundBoard();
+const camera = new CameraController();
 
 function resetMatch() {
   game.resetGame();
@@ -52,6 +55,8 @@ const input = new InputController({
       resetMatch();
     } else if (key === "u") {
       sound.toggle();
+    } else if (key === "c") {
+      camera.toggle();
     } else if (key === "m") {
       game.setMode(game.mode === GAME_MODES.ai ? GAME_MODES.local : GAME_MODES.ai);
     } else if (key === "n") {
@@ -83,6 +88,11 @@ ui.soundButton.addEventListener("click", () => {
   sound.unlock();
   sound.toggle();
   ui.soundButton.blur();
+});
+
+ui.cameraButton.addEventListener("click", () => {
+  camera.toggle();
+  ui.cameraButton.blur();
 });
 
 ui.resetButton.addEventListener("click", () => {
@@ -147,6 +157,7 @@ function consumeEvents(state) {
   state.events.forEach((event) => {
     if (event.id > lastEventId) {
       effects.handleEvent(event, state, sound);
+      camera.handleEvent(event);
       lastEventId = event.id;
       if (event.type === "explosion" && document.body.classList.contains("touch")) {
         navigator.vibrate?.(35);
@@ -178,11 +189,13 @@ function frame(timestamp) {
   sound.setCharge(state.phase === "aiming" && state.charge.active ? state.charge.power : null);
 
   renderer.beginFrame();
+  camera.update(deltaMs / 1000, state, renderer);
   drawScene(renderer, state, effects, timestamp / 1000);
   hud.render(state, {
     mode: game.mode,
     aiDifficulty: game.aiDifficulty,
     soundEnabled: sound.enabled,
+    cameraEnabled: camera.enabled,
   });
 
   window.requestAnimationFrame(frame);
