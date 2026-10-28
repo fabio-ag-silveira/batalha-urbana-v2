@@ -1,16 +1,21 @@
 import {
   CART_SIZE,
-  CITY_LAYOUT,
+  CRATES,
   FUEL_PER_TURN,
   MAX_HP,
+  ROUND_MODIFIERS,
   ROUNDS_TO_WIN,
+  SEA_FLOOR_Y,
   SKY_THEMES,
   TURN_TIME_MS,
+  VIEW_BOUNDS,
+  WATER_Y,
   WEAPONS,
   WIND_MAX,
 } from "./config.js";
-import { createRectPoints, createRng, transformPoints } from "./math.js";
-import { getProjectileOrigin } from "./physics.js";
+import { clamp, createRectPoints, createRng, transformPoints } from "./math.js";
+import { getProjectileOrigin, terrainHeightAt } from "./physics.js";
+import { getMap } from "./map.js";
 
 const FONT = "'Trebuchet MS', 'Segoe UI', sans-serif";
 
@@ -270,31 +275,74 @@ function drawBackdrop(renderer, state, theme) {
       }
       x += width + rng() * 0.8;
     }
+    drawCitadel(renderer, theme.citadel);
+    const context = renderer.context;
+    context.globalCompositeOperation = "source-atop";
+    context.globalAlpha = 0.45;
+    context.fillStyle = theme.sky[1];
+    context.fillRect(0, 0, renderer.width, renderer.height);
+    context.globalAlpha = 1;
+    context.globalCompositeOperation = "source-over";
     const hazeTop = renderer.toScreen({ x: 0, y: -14 }, "view").y;
     renderer.fillVerticalGradient(["rgba(0, 0, 0, 0)", theme.haze], hazeTop, renderer.height);
-    drawCitadel(renderer, theme.citadel);
   });
 }
 
-function drawCity(renderer, state, theme) {
+function drawBuildings(renderer, map, theme, rng) {
+  map.buildings.forEach((building) => {
+    const origin = { x: building.x, y: building.y };
+    if (building.type === "large") {
+      drawBuildingLarge(renderer, origin, building.scaleY, theme, rng);
+    } else if (building.type === "small") {
+      drawBuildingSmall(renderer, origin, building.scaleY, theme, rng);
+    } else {
+      drawTower(renderer, origin, theme);
+    }
+  });
+}
+
+// Ilhas (terreno + predios) numa camada cacheada; crateras recortadas como antes.
+function drawIslands(renderer, state, theme, map) {
   const lastCrater = state.craters[state.craters.length - 1];
   const version = `${state.seed}:${state.theme}:${state.craters.length}:${lastCrater?.x ?? ""}:${renderer.cameraKey}`;
 
-  renderer.drawLayer("city", version, (context) => {
-    const rng = createRng(state.seed);
-    CITY_LAYOUT.forEach((building) => {
-      const origin = { x: building.x, y: building.y };
-      if (building.type === "large") {
-        drawBuildingLarge(renderer, origin, building.scaleY ?? 1, theme, rng);
-      } else if (building.type === "small") {
-        drawBuildingSmall(renderer, origin, building.scaleY ?? 1, theme, rng);
+  renderer.drawLayer("islands", version, (context) => {
+    const surface = map.heights.map((height, index) => ({ x: map.minX + index * map.step, y: height }));
+    const outline = [
+      { x: map.minX, y: SEA_FLOOR_Y - 30 },
+      ...surface,
+      { x: surface[surface.length - 1].x, y: SEA_FLOOR_Y - 30 },
+    ];
+    const top = renderer.toScreen({ x: 0, y: WATER_Y + 32 }).y;
+    const bottom = renderer.toScreen({ x: 0, y: WATER_Y - 2 }).y;
+    const gradient = context.createLinearGradient(0, top, 0, bottom);
+    gradient.addColorStop(0, theme.rock);
+    gradient.addColorStop(0.45, theme.soil);
+    gradient.addColorStop(0.82, theme.sand);
+    gradient.addColorStop(1, theme.sand);
+    renderer.drawPolygon(outline, { fill: gradient, stroke: "rgba(0, 0, 0, 0.35)", lineWidth: 1 });
+
+    // Grama so onde o terreno fica bem acima da agua.
+    let run = [];
+    const flushGrass = () => {
+      if (run.length > 1) {
+        renderer.drawLine(run, { stroke: theme.grass, lineWidth: 2.5 * renderer.camera.zoom });
+      }
+      run = [];
+    };
+    surface.forEach((point) => {
+      if (point.y > WATER_Y + 3) {
+        run.push(point);
       } else {
-        drawTower(renderer, origin, theme);
+        flushGrass();
       }
     });
+    flushGrass();
+
+    drawBuildings(renderer, map, theme, createRng(state.seed));
 
     if (state.craters.length) {
-      // Primeiro queima a borda (so onde ha predio), depois recorta o buraco.
+      // Primeiro queima a borda (so onde ha solido), depois recorta o buraco.
       context.globalCompositeOperation = "source-atop";
       state.craters.forEach((crater) => renderer.drawEllipse(crater, crater.r * 1.35, { fill: "rgba(28, 16, 8, 0.6)" }));
       context.globalCompositeOperation = "destination-out";
@@ -304,34 +352,90 @@ function drawCity(renderer, state, theme) {
   });
 }
 
-function drawStreet(renderer, theme) {
-  drawRect(renderer, -420, -60, 420, -12.5, theme.street, null);
-  renderer.drawLine([{ x: -420, y: -12.5 }, { x: 420, y: -12.5 }], { stroke: theme.curb, lineWidth: 2 });
+// Mar translucido por cima das ilhas: as praias somem naturalmente sob as ondas.
+function drawWater(renderer, theme, time) {
+  const context = renderer.context;
+  const { width, height } = renderer;
+  const { left, zoom } = renderer.camera;
+  const surfaceY = renderer.toScreen({ x: 0, y: WATER_Y }).y;
+  const visibleWidth = (VIEW_BOUNDS.maxX - VIEW_BOUNDS.minX) / zoom;
+  const amplitude = 1.5 + zoom;
+
+  const wave = (screenX, phase) => {
+    const viewX = left + (screenX / width) * visibleWidth;
+    return surfaceY + Math.sin(viewX * 0.9 + time * 1.6 + phase) * amplitude
+      + Math.sin(viewX * 0.37 - time * 0.9 + phase) * amplitude * 0.6;
+  };
+  const tracePath = (phase) => {
+    context.beginPath();
+    context.moveTo(-40, height + 40);
+    for (let x = -40; x <= width + 40; x += 12) {
+      context.lineTo(x, wave(x, phase));
+    }
+    context.lineTo(width + 40, height + 40);
+    context.closePath();
+  };
+
+  const gradient = context.createLinearGradient(0, surfaceY, 0, height);
+  gradient.addColorStop(0, theme.water);
+  gradient.addColorStop(1, theme.waterDeep);
+  tracePath(1.7);
+  renderer.applyStyle({ fill: theme.water, alpha: 0.35 });
+  tracePath(0);
+  renderer.applyStyle({ fill: gradient });
+
+  context.beginPath();
+  for (let x = -40; x <= width + 40; x += 12) {
+    const y = wave(x, 0);
+    if (x === -40) {
+      context.moveTo(x, y);
+    } else {
+      context.lineTo(x, y);
+    }
+  }
+  renderer.applyStyle({ stroke: theme.waterLine, lineWidth: 1.5 });
 }
 
-function buildCannonPolygon(player, recoil) {
+function buildCannonPolygon(player, pivot, recoil) {
   const kick = recoil * 1.5;
   const barrel = createRectPoints(-0.7, 0.5 - kick, 0.7, 6.5 - kick);
-  return transformPoints(barrel, { x: player.position.x, y: player.position.y + 3, rotation: player.angle });
+  return transformPoints(barrel, { x: pivot.x, y: pivot.y, rotation: player.angle });
 }
 
-function drawCart(renderer, player, recoil) {
+// Inclinacao visual pelo relevo; em telhado ou no ar o carrinho fica reto.
+function cartTilt(player, map) {
   const { x, y } = player.position;
+  const onBuilding = [-2.5, 2.5].some((offset) => map.colliders.some((collider) =>
+    Math.abs(collider.x - (x + offset)) <= collider.halfWidth &&
+    Math.abs(collider.y + collider.halfHeight - (y - 2.5)) < 1.5));
+  if (player.falling || onBuilding) {
+    return 0;
+  }
+  const slope = (terrainHeightAt(map, x + 3) - terrainHeightAt(map, x - 3)) / 6;
+  return clamp((Math.atan(slope) * 180) / Math.PI, -30, 30);
+}
 
-  renderer.drawPolygon(buildCannonPolygon(player, recoil), { fill: player.color, stroke: "#111111" });
-  drawRect(renderer, x - 2, y + 1, x + 2, y + 4.4, player.shade);
-  renderer.drawPolygon([
-    { x: x - 3.9, y: y - 1.4 },
-    { x: x - 3.4, y: y + 1.6 },
-    { x: x + 3.4, y: y + 1.6 },
-    { x: x + 3.9, y: y - 1.4 },
-  ], { fill: player.color, stroke: "#111111" });
-  drawRect(renderer, x - 3.2, y + 0.9, x + 3.2, y + 1.4, "#ffffff", null, 0.35);
-  drawRect(renderer, x - 3.8, y - 1.4, x + 3.8, y - 0.5, "#000000", null, 0.25);
+function drawCart(renderer, player, recoil, map) {
+  const sinkOffset = player.sunk ? 4 : 0;
+  const base = { x: player.position.x, y: player.position.y - sinkOffset };
+  const rotation = cartTilt(player, map);
+  const place = (points) => transformPoints(points, { x: base.x, y: base.y, rotation });
+  const placePoint = (x, y) => place([{ x, y }])[0];
+
+  renderer.drawPolygon(buildCannonPolygon(player, placePoint(0, 3), recoil), { fill: player.color, stroke: "#111111" });
+  renderer.drawPolygon(place(createRectPoints(-2, 1, 2, 4.4)), { fill: player.shade, stroke: "#000000" });
+  renderer.drawPolygon(place([
+    { x: -3.9, y: -1.4 },
+    { x: -3.4, y: 1.6 },
+    { x: 3.4, y: 1.6 },
+    { x: 3.9, y: -1.4 },
+  ]), { fill: player.color, stroke: "#111111" });
+  renderer.drawPolygon(place(createRectPoints(-3.2, 0.9, 3.2, 1.4)), { fill: "#ffffff", alpha: 0.35 });
+  renderer.drawPolygon(place(createRectPoints(-3.8, -1.4, 3.8, -0.5)), { fill: "#000000", alpha: 0.25 });
 
   [-1, 1].forEach((side) => {
-    const center = { x: x + side * CART_SIZE, y: y - 0.5 };
-    const spin = x / 1.5;
+    const center = placePoint(side * CART_SIZE, -0.5);
+    const spin = base.x / 1.5;
     renderer.drawEllipse(center, 1.5, { fill: "#16181d", stroke: "#000000" });
     renderer.drawEllipse(center, 0.65, { fill: player.shade });
     renderer.drawLine([
@@ -340,8 +444,71 @@ function drawCart(renderer, player, recoil) {
     ], { stroke: "#6b7280", lineWidth: 1 });
   });
 
-  renderer.drawEllipse({ x, y: y + 3 }, 1.6, { fill: player.color, stroke: "#111111" });
-  renderer.drawEllipse({ x: x - 0.5, y: y + 3.6 }, 0.5, { fill: "#ffffff", alpha: 0.5 });
+  renderer.drawEllipse(placePoint(0, 3), 1.6, { fill: player.color, stroke: "#111111" });
+  renderer.drawEllipse(placePoint(-0.5, 3.6), 0.5, { fill: "#ffffff", alpha: 0.5 });
+}
+
+function drawCrateSymbol(renderer, crate, color) {
+  const { x, y } = crate;
+  if (crate.type === "hp") {
+    renderer.drawPolygon(createRectPoints(x - 0.35, y - 1.1, x + 0.35, y + 1.1), { fill: color });
+    renderer.drawPolygon(createRectPoints(x - 1.1, y - 0.35, x + 1.1, y + 0.35), { fill: color });
+  } else if (crate.type === "fuel") {
+    renderer.drawPolygon([{ x, y: y + 1.2 }, { x: x - 0.8, y: y - 0.1 }, { x: x + 0.8, y: y - 0.1 }], { fill: color });
+    renderer.drawEllipse({ x, y: y - 0.3 }, 0.8, { fill: color });
+  } else {
+    renderer.drawPolygon(createRectPoints(x - 0.5, y - 1.1, x + 0.5, y + 0.4), { fill: color });
+    renderer.drawEllipse({ x, y: y + 0.45 }, 0.5, { fill: color });
+  }
+}
+
+function drawCrate(renderer, crate, time) {
+  const spec = CRATES.types[crate.type];
+  const { x, y } = crate;
+  if (crate.parachute) {
+    const sway = Math.sin(time * 2 + crate.id) * 1.2;
+    const canopyY = y + 9;
+    const canopy = [];
+    for (let index = 0; index <= 12; index += 1) {
+      const angle = Math.PI * (index / 12);
+      canopy.push({ x: x + sway + Math.cos(angle) * 5, y: canopyY + Math.sin(angle) * 2.6 });
+    }
+    renderer.drawLine([{ x: x - 1.6, y: y + 1.6 }, { x: x + sway - 5, y: canopyY }], { stroke: "rgba(255, 255, 255, 0.7)", lineWidth: 1 });
+    renderer.drawLine([{ x: x + 1.6, y: y + 1.6 }, { x: x + sway + 5, y: canopyY }], { stroke: "rgba(255, 255, 255, 0.7)", lineWidth: 1 });
+    renderer.drawPolygon(canopy, { fill: "#f4f4f5", stroke: spec.color, lineWidth: 1.5 });
+  }
+  renderer.drawPolygon(createRectPoints(x - 1.6, y - 1.6, x + 1.6, y + 1.6), { fill: "#9a6b3c", stroke: "#3b2a17", lineWidth: 1.5 });
+  renderer.drawPolygon(createRectPoints(x - 1.6, y - 0.2, x + 1.6, y + 0.2), { fill: "#000000", alpha: 0.15 });
+  drawCrateSymbol(renderer, crate, spec.color);
+}
+
+// Chuva da tempestade, inclinada pelo vento.
+function drawRain(renderer, wind, time) {
+  const context = renderer.context;
+  const { width, height } = renderer;
+  const rng = createRng(911);
+  const slant = clamp(wind * 6, -14, 14);
+  context.beginPath();
+  for (let index = 0; index < 140; index += 1) {
+    const speed = 600 + rng() * 300;
+    const x = ((rng() * (width + 80) + time * slant * 30) % (width + 80) + width + 80) % (width + 80) - 40;
+    const y = (rng() * height + time * speed) % (height + 40) - 20;
+    context.moveTo(x, y);
+    context.lineTo(x + slant, y + 16);
+  }
+  renderer.applyStyle({ stroke: "rgba(200, 220, 255, 0.35)", lineWidth: 1 });
+}
+
+function drawFog(renderer, theme, time) {
+  const surfaceY = renderer.toScreen({ x: 0, y: WATER_Y }).y;
+  renderer.fillVerticalGradient(["rgba(0, 0, 0, 0)", theme.fog, theme.fog], surfaceY - renderer.height * 0.45, renderer.height + 40);
+  const rng = createRng(77);
+  for (let index = 0; index < 6; index += 1) {
+    const span = renderer.width + 400;
+    const x = ((rng() * span + time * (8 + rng() * 10)) % span) - 200;
+    const y = surfaceY - rng() * renderer.height * 0.3;
+    screenEllipse(renderer, x, y, 160 + rng() * 120, 26 + rng() * 20, theme.fog, 0.6);
+  }
 }
 
 function drawAimGuide(renderer, player) {
@@ -424,7 +591,7 @@ function drawPlayerTag(renderer, player, { isCurrent, aiming, charge, time }) {
 
   if (aiming) {
     renderer.drawRoundedRect(anchor.x - barWidth / 2, top + 5, barWidth, 3, 1.5, { fill: "rgba(0, 0, 0, 0.5)" });
-    renderer.drawRoundedRect(anchor.x - barWidth / 2, top + 5, (barWidth * player.fuel) / FUEL_PER_TURN, 3, 1.5, {
+    renderer.drawRoundedRect(anchor.x - barWidth / 2, top + 5, (barWidth * Math.min(1, player.fuel / FUEL_PER_TURN)), 3, 1.5, {
       fill: "#ffd166",
     });
     drawWeaponLabel(renderer, player, anchor.x, top - 64);
@@ -470,15 +637,19 @@ function drawScoreDots(renderer, x, y, score, color, label) {
   }
 }
 
-function drawWindIndicator(renderer, wind, centerX, top) {
+function drawWindIndicator(renderer, wind, centerX, top, hidden) {
   renderer.drawText("VENTO", centerX, top + 14, { font: `700 9px ${FONT}`, fill: "rgba(255, 255, 255, 0.6)" });
+  if (hidden) {
+    renderer.drawText("?", centerX, top + 34, { font: `800 20px ${FONT}`, fill: "rgba(255, 255, 255, 0.85)" });
+    return;
+  }
   if (Math.abs(wind) < 0.05) {
     renderer.drawText("calmo", centerX, top + 35, { font: `700 13px ${FONT}` });
     return;
   }
 
   const direction = Math.sign(wind);
-  const length = 10 + (Math.abs(wind) / WIND_MAX) * 38;
+  const length = 10 + Math.min(1, Math.abs(wind) / WIND_MAX) * 38;
   const arrowY = top + 30;
   const startX = centerX - (direction * length) / 2;
   const endX = centerX + (direction * length) / 2;
@@ -536,26 +707,44 @@ function drawOverlay(renderer, state, time) {
   });
   drawScoreDots(renderer, left + 42, top + 24, state.totalScore[0], playerOne.color, "P1");
   drawScoreDots(renderer, left + panelWidth - 42, top + 24, state.totalScore[1], playerTwo.color, "P2");
-  drawWindIndicator(renderer, state.wind, left + 138, top);
+  const modifier = ROUND_MODIFIERS[state.modifier] ?? ROUND_MODIFIERS.normal;
+  drawWindIndicator(renderer, state.wind, left + 138, top, Boolean(modifier.hideWind));
   drawTurnTimer(renderer, state, left + 218, top + 27, time);
+
+  if (modifier.id !== "normal") {
+    const label = modifier.label.toUpperCase();
+    renderer.context.font = `800 10px ${FONT}`;
+    const badgeWidth = renderer.context.measureText(label).width + 22;
+    renderer.drawRoundedRect(renderer.width / 2 - badgeWidth / 2, top + 60, badgeWidth, 20, 10, {
+      fill: "rgba(250, 204, 21, 0.9)",
+    });
+    renderer.drawText(label, renderer.width / 2, top + 70.5, { font: `800 10px ${FONT}`, fill: "#1f1a05" });
+  }
 }
 
 export function drawScene(renderer, state, effects, time) {
   const theme = SKY_THEMES[state.theme] ?? SKY_THEMES.day;
+  const map = getMap(state.seed);
   const context = renderer.context;
   const current = state.players[state.turnIndex];
   const aiming = state.phase === "aiming";
   const shake = effects.shakeOffset;
 
   drawSky(renderer, theme, time, effects.cloudOffset);
+  if (state.modifier === "storm") {
+    renderer.fillVerticalGradient(["rgba(15, 18, 30, 0.45)", "rgba(15, 18, 30, 0.2)"]);
+  }
 
   context.save();
   context.translate(shake.x, shake.y);
   drawBackdrop(renderer, state, theme);
-  drawCity(renderer, state, theme);
-  drawStreet(renderer, theme);
-
-  state.players.forEach((player) => drawCart(renderer, player, effects.getRecoil(player.id)));
+  drawIslands(renderer, state, theme, map);
+  state.crates.forEach((crate) => drawCrate(renderer, crate, time));
+  state.players.forEach((player) => drawCart(renderer, player, effects.getRecoil(player.id), map));
+  drawWater(renderer, theme, time);
+  if (state.modifier === "fog") {
+    drawFog(renderer, theme, time);
+  }
   if (aiming) {
     drawAimGuide(renderer, current);
   }
@@ -564,7 +753,7 @@ export function drawScene(renderer, state, effects, time) {
   state.projectiles.forEach((projectile) => drawProjectile(renderer, projectile));
   effects.drawWorld(renderer);
 
-  state.players.forEach((player) => drawPlayerTag(renderer, player, {
+  state.players.filter((player) => !player.sunk).forEach((player) => drawPlayerTag(renderer, player, {
     isCurrent: player.id === current.id && (aiming || state.phase === "flying"),
     aiming,
     charge: state.charge,
@@ -572,6 +761,9 @@ export function drawScene(renderer, state, effects, time) {
   }));
   context.restore();
 
+  if (state.modifier === "storm") {
+    drawRain(renderer, state.wind, time);
+  }
   drawOverlay(renderer, state, time);
   effects.drawOverlay(renderer);
 }

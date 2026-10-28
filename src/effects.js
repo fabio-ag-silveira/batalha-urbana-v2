@@ -1,4 +1,6 @@
-import { WEAPONS } from "./config.js";
+import { CRATES, ROUND_MODIFIERS, WEAPONS } from "./config.js";
+
+const SPLASH_COLORS = ["#e0f2fe", "#93c5fd", "#ffffff"];
 
 const FONT = "'Trebuchet MS', 'Segoe UI', sans-serif";
 const MAX_PARTICLES = 450;
@@ -80,6 +82,12 @@ export class Effects {
       case "explosion": {
         // Tudo escala com o raio: fragmentos sao estalos, o pesado sacode a tela.
         const scale = event.radius / WEAPONS.standard.radius;
+        if (event.water) {
+          this.splash(event, scale);
+          this.addShake(5 * scale);
+          sound?.splash(scale);
+          break;
+        }
         this.rings.push({ x: event.x, y: event.y, radius: event.radius, life: 0.45, maxLife: 0.45 });
         this.flashes.push({ x: event.x, y: event.y, life: 0.2, maxLife: 0.2, radius: 70 * scale });
         this.burst(event, {
@@ -96,8 +104,40 @@ export class Effects {
         break;
       }
       case "bounce":
-        this.burst(event, { count: 6, colors: ["#86efac", "#ffffff"], speed: 25, life: 0.3, size: 0.7, gravity: 30 });
+        if (event.water) {
+          this.splash(event, 0.4);
+        } else {
+          this.burst(event, { count: 6, colors: ["#86efac", "#ffffff"], speed: 25, life: 0.3, size: 0.7, gravity: 30 });
+        }
         sound?.bounce();
+        break;
+      case "sink":
+        this.splash(event, 1.4);
+        this.burst({ x: event.x, y: event.y - 2 }, {
+          count: 14, colors: ["#bfdbfe", "#ffffff"], speed: 6, life: 1.6, size: 0.8, gravity: -14, alpha: 0.7,
+        });
+        this.showBanner(`${event.label} afundou!`, { color: "#93c5fd", duration: 2 });
+        this.addShake(6);
+        sound?.sink();
+        break;
+      case "crateDrop":
+        this.texts.push({ x: event.x, y: CRATES.spawnY - 6, text: "Suprimento!", color: "#fde68a", size: 13, life: 1.6, maxLife: 1.6 });
+        sound?.select();
+        break;
+      case "cratePickup": {
+        const crateColor = CRATES.types[event.crateType]?.color ?? "#ffffff";
+        this.texts.push({ x: event.x, y: event.y + 5, text: event.text, color: crateColor, size: 15, life: 1.6, maxLife: 1.6 });
+        this.flashes.push({ x: event.x, y: event.y, life: 0.25, maxLife: 0.25, radius: 34 });
+        this.burst(event, { count: 12, colors: [crateColor, "#ffffff"], speed: 22, life: 0.6, size: 0.6, gravity: -6 });
+        sound?.pickup();
+        break;
+      }
+      case "crateLost":
+        if (event.reason === "water") {
+          this.splash(event, 0.5);
+        } else {
+          this.burst(event, { count: 10, colors: ["#9a6b3c", "#5b3d1f"], speed: 35, life: 0.9, size: 0.8, gravity: 90, lift: 15 });
+        }
         break;
       case "split":
         this.flashes.push({ x: event.x, y: event.y, life: 0.12, maxLife: 0.12, radius: 30 });
@@ -139,9 +179,15 @@ export class Effects {
         this.showBanner(`Vez de ${event.label}`, { color, duration: 1.1, small: true });
         sound?.turn();
         break;
-      case "roundStart":
-        this.showBanner(`Rodada ${event.round}`, { duration: 1.5 });
+      case "roundStart": {
+        const modifier = ROUND_MODIFIERS[event.modifier];
+        const special = modifier && modifier.id !== "normal";
+        this.showBanner(`Rodada ${event.round}`, {
+          duration: special ? 2.2 : 1.5,
+          subtitle: special ? `Condição: ${modifier.label}` : "",
+        });
         break;
+      }
       case "roundEnd":
         this.showBanner(event.label ? `${event.label} venceu a rodada!` : "Empate!", { color, duration: 2.4 });
         sound?.win();
@@ -157,6 +203,14 @@ export class Effects {
       default:
         break;
     }
+  }
+
+  // Coluna de agua para cima, sem fogo nem detrito.
+  splash(origin, scale) {
+    this.rings.push({ x: origin.x, y: origin.y, radius: 10 * scale, life: 0.5, maxLife: 0.5, color: "#e0f2fe" });
+    this.burst(origin, {
+      count: Math.round(22 * scale), colors: SPLASH_COLORS, speed: 18 * scale, life: 0.9, size: 0.9, gravity: 70, lift: 35 * scale, alpha: 0.85,
+    });
   }
 
   update(dt, state) {
@@ -213,7 +267,7 @@ export class Effects {
 
   emitDamageSmoke(dt, state) {
     state.players.forEach((player) => {
-      if (player.hp >= 50) {
+      if (player.hp >= 50 || player.sunk) {
         return;
       }
       const interval = player.hp <= 0 ? 0.06 : player.hp < 25 ? 0.12 : 0.25;
@@ -295,7 +349,7 @@ export class Effects {
     this.rings.forEach((ring) => {
       const strength = ring.life / ring.maxLife;
       renderer.drawEllipse(ring, ring.radius * (0.3 + 0.9 * (1 - strength)), {
-        stroke: "#fff2c4",
+        stroke: ring.color ?? "#fff2c4",
         lineWidth: 1 + 4 * strength,
         alpha: strength,
       });
@@ -323,7 +377,8 @@ export class Effects {
     const alpha = Math.min(1, elapsed / 0.15, banner.life / 0.3);
     const pop = 1 + Math.max(0, 0.25 - elapsed) * 1.2;
     const size = Math.round((banner.small ? 22 : 38) * pop);
-    const y = renderer.height * (banner.small ? 0.24 : 0.32);
+    // Sempre abaixo do painel do topo e do selo de modificador.
+    const y = Math.max(renderer.height * (banner.small ? 0.24 : 0.32), banner.small ? 112 : 130);
 
     renderer.drawText(banner.text, renderer.width / 2, y, {
       font: `800 ${size}px ${FONT}`,

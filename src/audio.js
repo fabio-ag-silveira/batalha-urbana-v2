@@ -111,6 +111,21 @@ export class SoundBoard {
     this.tone({ type: "sine", from: 130 - 20 * scale, to: 30, duration: 0.3 + 0.3 * scale, volume: Math.min(0.7, 0.5 * scale) });
   }
 
+  splash(scale = 1) {
+    this.noise({ duration: 0.4 + 0.3 * scale, volume: Math.min(0.7, 0.35 * scale + 0.2), filter: "bandpass", from: 1400, to: 400 });
+  }
+
+  sink() {
+    this.noise({ duration: 1.1, volume: 0.6, filter: "lowpass", from: 900, to: 90 });
+    this.tone({ type: "sine", from: 420, to: 90, duration: 0.9, volume: 0.25 });
+  }
+
+  pickup() {
+    [784, 988, 1318].forEach((frequency, index) => {
+      this.tone({ type: "triangle", from: frequency, duration: 0.12, volume: 0.16, delay: index * 0.06 });
+    });
+  }
+
   bounce() {
     this.tone({ type: "sine", from: 300, to: 520, duration: 0.12, volume: 0.18 });
   }

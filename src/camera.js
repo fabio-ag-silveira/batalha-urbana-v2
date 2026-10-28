@@ -1,4 +1,4 @@
-import { CITY_TRANSFORM, VIEW_BOUNDS } from "./config.js";
+import { CITY_TRANSFORM, VIEW_BOUNDS, WATER_Y } from "./config.js";
 
 const VIEW_WIDTH = VIEW_BOUNDS.maxX - VIEW_BOUNDS.minX;
 const MAX_ZOOM = 2.4;
@@ -6,6 +6,8 @@ const MARGIN_X = 9;
 const MARGIN_TOP = 7;
 const STORAGE_KEY = "batalha_urbana_camera";
 const WIDE_PHASES = ["roundStart", "roundOver", "matchOver"];
+// Base do enquadramento: 10 unidades abaixo da agua, em coordenadas de view.
+const BOTTOM_VIEW = (WATER_Y - 10 + CITY_TRANSFORM.translateY) * CITY_TRANSFORM.scaleY;
 
 function toView(point) {
   return {
@@ -67,7 +69,7 @@ export class CameraController {
     const maxX = Math.max(...view.map((point) => point.x)) + MARGIN_X;
     const maxY = Math.max(...view.map((point) => point.y)) + MARGIN_TOP;
     const zoomX = VIEW_WIDTH / Math.max(1, maxX - minX);
-    const zoomY = viewHeight / Math.max(1, maxY - VIEW_BOUNDS.minY);
+    const zoomY = viewHeight / Math.max(1, maxY - BOTTOM_VIEW);
     return {
       zoom: Math.min(MAX_ZOOM, Math.max(1, Math.min(zoomX, zoomY))),
       centerX: (minX + maxX) / 2,
@@ -95,6 +97,6 @@ export class CameraController {
 
     const visibleWidth = VIEW_WIDTH / this.zoom;
     const left = Math.min(VIEW_BOUNDS.maxX - visibleWidth, Math.max(VIEW_BOUNDS.minX, this.centerX - visibleWidth / 2));
-    renderer.camera = { left, bottom: VIEW_BOUNDS.minY, zoom: this.zoom };
+    renderer.camera = { left, bottom: BOTTOM_VIEW, zoom: this.zoom };
   }
 }

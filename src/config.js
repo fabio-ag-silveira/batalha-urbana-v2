@@ -105,9 +105,10 @@ export const MOVE_SPEED = 22;
 export const FUEL_PER_TURN = 40;
 export const TURN_TIME_MS = 20000;
 export const CART_GRAVITY = 70;
+// Velocidade do empurrao de uma explosao padrao no centro; escala com o raio da arma.
+export const KNOCKBACK = 28;
 export const SAFE_FALL = 10;
-export const STREET_Y = -16;
-export const CART_X_LIMIT = 194;
+export const CART_X_LIMIT = 200;
 export const PROJECTILE_SUBSTEP = 0.01;
 export const PHASE_DELAYS = {
   roundStart: 1600,
@@ -115,6 +116,46 @@ export const PHASE_DELAYS = {
   timeout: 400,
   roundOver: 2600,
   matchOver: 8000,
+};
+
+// Mar e arquipelago: o nivel da agua e o antigo nivel da rua, na base da camera.
+export const WATER_Y = -16;
+export const SEA_FLOOR_Y = -26;
+export const MAP_GEN = {
+  minX: -210,
+  maxX: 210,
+  usableMinX: -195,
+  usableMaxX: 195,
+  islandCount: [3, 4],
+  islandWidth: [60, 120],
+  channelWidth: [25, 45],
+  baseHeight: [6, 20],
+  maxHeight: 34,
+  buildingsPerIsland: [1, 3],
+  minSpawnDistance: 80,
+};
+
+export const ROUND_MODIFIERS = {
+  normal: { id: "normal", label: "Normal", weight: 4 },
+  storm: { id: "storm", label: "Tempestade", weight: 1.5, windScale: 2 },
+  lowGravity: { id: "lowGravity", label: "Gravidade baixa", weight: 1.5, gravityScale: 0.6 },
+  fog: { id: "fog", label: "Neblina", weight: 1.5, hideWind: true, aiWindScale: 0.5 },
+  arsenal: { id: "arsenal", label: "Arsenal", weight: 1.5, ammoScale: 2 },
+};
+
+export const CRATES = {
+  dropChance: 0.35,
+  firstTurn: 3,
+  max: 2,
+  spawnY: 100,
+  parachuteSpeed: 9,
+  freeFallSpeed: 35,
+  pickupRadius: 6,
+  types: {
+    hp: { id: "hp", label: "Vida", amount: 30, color: "#4ade80" },
+    fuel: { id: "fuel", label: "Combustível", amount: 30, color: "#ffd166" },
+    ammo: { id: "ammo", label: "Munição", amount: 1, color: "#ffb347" },
+  },
 };
 
 export const SKY_THEMES = {
@@ -130,8 +171,14 @@ export const SKY_THEMES = {
     windowLit: "#f6e151",
     windowDark: "#d9dfe4",
     litChance: 0.25,
-    street: "#3b3d42",
-    curb: "#8d9096",
+    water: "rgba(38, 124, 186, 0.8)",
+    waterDeep: "#174a6e",
+    waterLine: "rgba(255, 255, 255, 0.6)",
+    sand: "#e3c78a",
+    soil: "#8b6b43",
+    rock: "#5d5248",
+    grass: "#5fa34a",
+    fog: "rgba(220, 232, 238, 0.55)",
     stars: false,
   },
   dusk: {
@@ -146,8 +193,14 @@ export const SKY_THEMES = {
     windowLit: "#ffd36b",
     windowDark: "#2a2430",
     litChance: 0.55,
-    street: "#2b2830",
-    curb: "#7a6f7e",
+    water: "rgba(88, 66, 124, 0.82)",
+    waterDeep: "#2a1f45",
+    waterLine: "rgba(255, 200, 160, 0.5)",
+    sand: "#d8a878",
+    soil: "#6e4b3a",
+    rock: "#463644",
+    grass: "#5b7a46",
+    fog: "rgba(240, 190, 170, 0.45)",
     stars: false,
   },
   night: {
@@ -162,8 +215,14 @@ export const SKY_THEMES = {
     windowLit: "#ffe27a",
     windowDark: "#141826",
     litChance: 0.75,
-    street: "#15171f",
-    curb: "#3c4256",
+    water: "rgba(18, 34, 74, 0.86)",
+    waterDeep: "#060b1c",
+    waterLine: "rgba(160, 190, 255, 0.4)",
+    sand: "#8c7f63",
+    soil: "#3d3328",
+    rock: "#2a2630",
+    grass: "#2f4d33",
+    fog: "rgba(120, 140, 190, 0.4)",
     stars: true,
   },
 };
@@ -174,79 +233,11 @@ export const PLAYER_DEFAULTS = [
     label: "Player 1",
     color: "#00c8d7",
     shade: "#0d8e98",
-    spawns: [
-      { x: -123, y: -16 },
-      { x: -90, y: 7 },
-      { x: -17, y: -16 },
-      { x: 150, y: 11 },
-    ],
   },
   {
     id: 2,
     label: "Player 2",
     color: "#ff4a4a",
     shade: "#9c2d2d",
-    spawns: [
-      { x: -180, y: 7.7 },
-      { x: 60, y: 7.7 },
-      { x: 120, y: -16 },
-      { x: 180, y: 7.7 },
-    ],
   },
-];
-
-export const CITY_LAYOUT = [
-  { type: "large", x: -30, y: -5 },
-  { type: "small", x: -45, y: -2, scaleY: 1.25 },
-  { type: "small", x: -60, y: -5 },
-  { type: "large", x: -75, y: -5 },
-  { type: "small", x: -90, y: -5 },
-  { type: "small", x: -105, y: -7, scaleY: 0.8 },
-  { type: "large", x: -135, y: -5 },
-  { type: "small", x: -150, y: -5 },
-  { type: "large", x: -165, y: -5 },
-  { type: "small", x: -180, y: -5 },
-  { type: "tower", x: -195, y: -5 },
-  { type: "large", x: 15, y: -5 },
-  { type: "large", x: 30, y: -7, scaleY: 0.85 },
-  { type: "tower", x: 45, y: -5 },
-  { type: "small", x: 60, y: -5 },
-  { type: "large", x: 75, y: -5 },
-  { type: "tower", x: 90, y: -5 },
-  { type: "small", x: 105, y: -5 },
-  { type: "small", x: 135, y: -5 },
-  { type: "large", x: 150, y: -5 },
-  { type: "large", x: 165, y: -5 },
-  { type: "small", x: 180, y: -5 },
-];
-
-export const STATIC_COLLIDERS = [
-  { x: -30, y: -5, halfWidth: 7, halfHeight: 15 },
-  { x: -45, y: -3, halfWidth: 7, halfHeight: 15 },
-  { x: -60, y: -7.5, halfWidth: 7, halfHeight: 15 },
-  { x: -75, y: -5, halfWidth: 7, halfHeight: 15 },
-  { x: -90, y: -7.5, halfWidth: 7, halfHeight: 15 },
-  { x: -105, y: -12, halfWidth: 7, halfHeight: 15 },
-  { x: -135, y: -5, halfWidth: 7, halfHeight: 15 },
-  { x: -150, y: -7.5, halfWidth: 7, halfHeight: 15 },
-  { x: -165, y: -5, halfWidth: 7, halfHeight: 15 },
-  { x: -180, y: -7.5, halfWidth: 7, halfHeight: 15 },
-  { x: -195, y: -5, halfWidth: 7, halfHeight: 15 },
-  { x: -195, y: 12, halfWidth: 7, halfHeight: 3.5 },
-  { x: 15, y: -5, halfWidth: 7, halfHeight: 15 },
-  { x: 30, y: -8.5, halfWidth: 7, halfHeight: 15 },
-  { x: 45, y: -5, halfWidth: 7, halfHeight: 15 },
-  { x: 45, y: 12, halfWidth: 7, halfHeight: 3.5 },
-  { x: 60, y: -7.5, halfWidth: 7, halfHeight: 15 },
-  { x: 75, y: -5, halfWidth: 7, halfHeight: 15 },
-  { x: 90, y: -5, halfWidth: 7, halfHeight: 15 },
-  { x: 90, y: 12, halfWidth: 7, halfHeight: 3.5 },
-  { x: 105, y: -7.5, halfWidth: 7, halfHeight: 15 },
-  { x: 135, y: -7.5, halfWidth: 7, halfHeight: 15 },
-  { x: 150, y: -5, halfWidth: 7, halfHeight: 15 },
-  { x: 165, y: -5, halfWidth: 7, halfHeight: 15 },
-  { x: 180, y: -7.5, halfWidth: 7, halfHeight: 15 },
-  { x: 205, y: -7.5, halfWidth: 7, halfHeight: 1500, kind: "wall" },
-  { x: -205, y: -7.5, halfWidth: 7, halfHeight: 1500, kind: "wall" },
-  { x: 0, y: -28, halfWidth: 1000, halfHeight: 15.5, kind: "ground" },
 ];

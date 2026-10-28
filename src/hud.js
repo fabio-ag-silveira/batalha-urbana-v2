@@ -1,4 +1,4 @@
-import { GAME_MODES, MAX_HP, ROUNDS_TO_WIN, WEAPONS } from "./config.js";
+import { GAME_MODES, MAX_HP, ROUND_MODIFIERS, ROUNDS_TO_WIN, WEAPONS } from "./config.js";
 
 const PHASE_LABELS = {
   roundStart: "Preparando a rodada...",
@@ -57,7 +57,11 @@ export class Hud {
         ? `${winner?.label ?? "Alguém"} venceu a partida!`
         : PHASE_LABELS[state.phase] ?? "";
 
-    this.write("round", (value) => { ui.roundLabel.textContent = value; }, `Rodada ${state.round + 1}`);
+    const modifier = ROUND_MODIFIERS[state.modifier];
+    const roundText = modifier && modifier.id !== "normal"
+      ? `Rodada ${state.round + 1} · ${modifier.label}`
+      : `Rodada ${state.round + 1}`;
+    this.write("round", (value) => { ui.roundLabel.textContent = value; }, roundText);
     this.write("turn", (value) => { ui.turnLabel.textContent = value; }, turnText);
     this.write("status", (value) => { ui.statusLabel.textContent = value; }, state.status);
     this.write("p1", (value) => { ui.playerOneStats.innerHTML = value; }, renderStats(state.players[0], state.totalScore[0]));

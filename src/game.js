@@ -4,13 +4,17 @@ import {
   AI_THINK_DELAY_MS,
   AIM_SPEED,
   CART_GRAVITY,
+  CART_SIZE,
   CHARGE_SECONDS,
+  CRATES,
   BOUNCE_RESTITUTION,
   DEFAULT_AI_DIFFICULTY,
   DEFAULT_GAME_MODE,
   ELEVATION_LIMITS,
   FUEL_PER_TURN,
   GAME_MODES,
+  KNOCKBACK,
+  GRAVITY,
   MAX_CRATERS,
   MAX_HP,
   MOVE_SPEED,
@@ -19,12 +23,13 @@ import {
   POWER_MAX_VELOCITY,
   POWER_MIN_VELOCITY,
   PROJECTILE_SUBSTEP,
+  ROUND_MODIFIERS,
   ROUNDS_TO_WIN,
   SAFE_FALL,
   SKY_THEMES,
-  STREET_Y,
   TIME_SCALE,
   TURN_TIME_MS,
+  WATER_Y,
   WEAPON_ORDER,
   WEAPONS,
   WIND_MAX,
@@ -36,22 +41,37 @@ import {
   getLaunchVelocity,
   getPlayerCenter,
   getProjectileOrigin,
-  isCartBlocked,
+  isCartSunk,
   isCartSupported,
+  isInWater,
   isInsidePlayerHitbox,
   isOutOfBounds,
   isSolid,
+  moveCartOnGround,
   powerToVelocity,
   projectileAt,
   projectileVelocityAt,
   velocityToPower,
 } from "./physics.js";
+import { getMap, pickSpawnPair } from "./map.js";
 
 const CONTROLS = ["up", "down", "left", "right", "fire", "weapon"];
 const STANDARD = WEAPONS.standard;
 
-function createAmmo() {
-  return Object.fromEntries(WEAPON_ORDER.map((id) => [id, WEAPONS[id].ammo]));
+function createAmmo(scale = 1) {
+  return Object.fromEntries(WEAPON_ORDER.map((id) => [id, WEAPONS[id].ammo === null ? null : WEAPONS[id].ammo * scale]));
+}
+
+function pickModifier() {
+  const options = Object.values(ROUND_MODIFIERS);
+  let roll = Math.random() * options.reduce((sum, option) => sum + option.weight, 0);
+  for (const option of options) {
+    roll -= option.weight;
+    if (roll <= 0) {
+      return option;
+    }
+  }
+  return ROUND_MODIFIERS.normal;
 }
 const MAX_EVENTS = 30;
 
@@ -59,16 +79,10 @@ function createInputState() {
   return Object.fromEntries(CONTROLS.map((control) => [control, false]));
 }
 
-function pickSpawns() {
-  const first = randomItem(PLAYER_DEFAULTS[0].spawns);
-  const options = PLAYER_DEFAULTS[1].spawns.filter((spawn) => Math.abs(spawn.x - first.x) > 40);
-  return [first, randomItem(options)];
-}
-
-function createPlayers() {
-  const spawns = pickSpawns();
+function createPlayers(map, modifier) {
+  const spawns = pickSpawnPair(map);
   return PLAYER_DEFAULTS.map((template, index) => {
-    const position = { ...spawns[index] };
+    const position = { x: spawns[index].x, y: spawns[index].y };
     const other = spawns[1 - index];
     const facing = other.x >= position.x ? 1 : -1;
     return {
@@ -82,10 +96,12 @@ function createPlayers() {
       angle: aimToAngle(facing, 45),
       hp: MAX_HP,
       fuel: FUEL_PER_TURN,
+      bonusFuel: 0,
       lastPower: null,
       weapon: STANDARD.id,
-      ammo: createAmmo(),
+      ammo: createAmmo(modifier.ammoScale ?? 1),
       fall: null,
+      sunk: false,
     };
   });
 }
@@ -146,19 +162,24 @@ export class Game {
     this.turnsInRound = 0;
     this.theme = randomItem(Object.keys(SKY_THEMES));
     this.seed = Math.floor(Math.random() * 2 ** 31);
+    this.map = getMap(this.seed);
+    this.modifier = pickModifier();
+    this.gravity = GRAVITY * (this.modifier.gravityScale ?? 1);
+    this.crates = [];
     this.craters = [];
     this.projectiles = [];
     this.shotStats = null;
     this.charge = { active: false, power: 0, direction: 1 };
     this.wind = 0;
     this.turnTimeMs = TURN_TIME_MS;
-    this.players = createPlayers();
+    this.players = createPlayers(this.map, this.modifier);
     this.aiPlan = null;
     this.aiThinkMs = 0;
     this.aiMissMemory.clear();
     this.setPhase("roundStart", PHASE_DELAYS.roundStart);
-    this.status = `Rodada ${this.round + 1}. Preparem-se!`;
-    this.emit("roundStart", { round: this.round + 1 });
+    const modifierText = this.modifier.id === "normal" ? "" : ` Condição: ${this.modifier.label}.`;
+    this.status = `Rodada ${this.round + 1}. Preparem-se!${modifierText}`;
+    this.emit("roundStart", { round: this.round + 1, modifier: this.modifier.id, modifierLabel: this.modifier.label });
   }
 
   setMode(mode) {
@@ -231,13 +252,16 @@ export class Game {
         break;
       case "aiming":
         this.updateFalling(dt);
+        this.updateCrates(dt);
         this.updateAiming(dt);
         break;
       case "flying":
         this.updateFalling(dt);
+        this.updateCrates(dt);
         this.updateProjectiles(dt);
         break;
       case "settling":
+        this.updateCrates(dt);
         if (!this.updateFalling(dt) && this.phaseMs <= 0) {
           this.resolveTurn();
         }
@@ -260,23 +284,31 @@ export class Game {
   beginTurn() {
     this.turnsInRound += 1;
     const growth = 0.6 + 0.4 * Math.min(1, this.turnsInRound / 6);
-    this.wind = Math.round(randomRange(-WIND_MAX, WIND_MAX) * growth * 10) / 10;
+    const windMax = WIND_MAX * (this.modifier.windScale ?? 1);
+    this.wind = Math.round(randomRange(-windMax, windMax) * growth * 10) / 10;
     this.turnTimeMs = TURN_TIME_MS;
     this.charge = { active: false, power: 0, direction: 1 };
     this.aiPlan = null;
     this.aiThinkMs = AI_THINK_DELAY_MS;
 
     const player = this.currentPlayer;
-    player.fuel = FUEL_PER_TURN;
+    player.fuel = FUEL_PER_TURN + player.bonusFuel;
+    player.bonusFuel = 0;
     this.setPhase("aiming");
     this.status = `Vez de ${player.label}. Mire, ajuste a força e atire!`;
     this.emit("turn", { playerId: player.id, label: player.label, wind: this.wind });
+    this.maybeDropCrate();
   }
 
   updateAiming(dt) {
     this.turnTimeMs -= dt;
     const player = this.currentPlayer;
     const seconds = dt / 1000;
+    if (this.players.some((entry) => entry.hp <= 0)) {
+      this.charge.active = false;
+      this.setPhase("settling", PHASE_DELAYS.settle);
+      return;
+    }
 
     if (this.isAiTurn) {
       this.updateAi(dt);
@@ -329,12 +361,12 @@ export class Game {
     }
 
     const distance = Math.min(MOVE_SPEED * seconds, player.fuel);
-    const nextX = player.position.x + direction * distance;
-    if (isCartBlocked(nextX, player.position.y, direction, this.craters)) {
+    const next = moveCartOnGround(player.position, direction * distance, this.map, this.craters);
+    if (!next) {
       return;
     }
     player.fuel = Math.max(0, player.fuel - distance);
-    player.position.x = nextX;
+    player.position = next;
   }
 
   startCharge() {
@@ -395,6 +427,7 @@ export class Game {
       origin: { ...origin },
       velocity,
       wind: this.wind,
+      gravity: this.gravity,
       elapsed: 0,
       position: { ...origin },
       bounces: 0,
@@ -419,11 +452,12 @@ export class Game {
     const weapon = WEAPONS[projectile.weapon];
     const previous = projectile.position;
     projectile.elapsed += step;
-    projectile.position = projectileAt(projectile.origin, projectile.velocity, projectile.wind, projectile.elapsed);
+    projectile.position = projectileAt(projectile.origin, projectile.velocity, projectile.wind, projectile.elapsed, projectile.gravity);
 
     // Fragmentos podem atingir o proprio dono; o tiro principal so depois de sair do cano.
     const ownerGrace = projectile.weapon === "bomblet" ? 0.15 : 0.5;
     const target = this.players.find((player) =>
+      !player.sunk &&
       isInsidePlayerHitbox(projectile.position, player) &&
       (player.id !== projectile.ownerId || projectile.elapsed > ownerGrace));
     if (target) {
@@ -431,7 +465,22 @@ export class Game {
       return;
     }
 
-    if (isSolid(projectile.position, this.craters)) {
+    // Atravessar uma caixa entrega o suprimento para quem atirou.
+    const crate = this.crates.find((entry) =>
+      Math.abs(entry.x - projectile.position.x) < 3.5 && Math.abs(entry.y - projectile.position.y) < 3.5);
+    if (crate) {
+      this.collectCrate(this.players.find((player) => player.id === projectile.ownerId), crate);
+    }
+
+    if (isInWater(projectile.position)) {
+      if (weapon.bounces && projectile.bounces < weapon.bounces && this.bounce(projectile, previous, true)) {
+        return;
+      }
+      this.detonate(projectile, null, previous, { water: true });
+      return;
+    }
+
+    if (isSolid(projectile.position, this.map, this.craters)) {
       if (weapon.bounces && projectile.bounces < weapon.bounces && this.bounce(projectile, previous)) {
         return;
       }
@@ -450,9 +499,9 @@ export class Game {
   }
 
   // Reflete a velocidade na parede (eixo x) ou no piso/teto (eixo y) e reinicia a trajetoria.
-  bounce(projectile, previous) {
-    const velocity = projectileVelocityAt(projectile.velocity, projectile.wind, projectile.elapsed);
-    const hitWall = !isSolid({ x: previous.x, y: projectile.position.y }, this.craters);
+  bounce(projectile, previous, onWater = false) {
+    const velocity = projectileVelocityAt(projectile.velocity, projectile.wind, projectile.elapsed, projectile.gravity);
+    const hitWall = !onWater && !isSolid({ x: previous.x, y: projectile.position.y }, this.map, this.craters);
     const reflected = hitWall
       ? { x: -velocity.x * BOUNCE_RESTITUTION, y: velocity.y * BOUNCE_RESTITUTION }
       : { x: velocity.x * BOUNCE_RESTITUTION, y: -velocity.y * BOUNCE_RESTITUTION };
@@ -464,14 +513,14 @@ export class Game {
     projectile.velocity = reflected;
     projectile.elapsed = 0;
     projectile.bounces += 1;
-    this.emit("bounce", { x: previous.x, y: previous.y });
+    this.emit("bounce", { x: previous.x, y: previous.y, water: onWater });
     return true;
   }
 
-  detonate(projectile, directTarget, previous) {
+  detonate(projectile, directTarget, previous, options = {}) {
     const weapon = WEAPONS[projectile.weapon];
     this.removeProjectile(projectile);
-    this.explode(projectile.position, directTarget, weapon, projectile.ownerId);
+    this.explode(projectile.position, directTarget, weapon, projectile.ownerId, options);
 
     if (weapon.split) {
       this.emit("split", { x: previous.x, y: previous.y });
@@ -486,13 +535,20 @@ export class Game {
     }
   }
 
-  explode(point, directTarget, weapon, ownerId) {
+  explode(point, directTarget, weapon, ownerId, { water = false } = {}) {
     const attacker = this.players.find((player) => player.id === ownerId);
-    this.craters.push({ x: point.x, y: point.y, r: weapon.crater });
-    if (this.craters.length > MAX_CRATERS) {
-      this.craters.shift();
+    // Na agua a explosao fere, mas nao abre cratera.
+    if (!water) {
+      this.craters.push({ x: point.x, y: point.y, r: weapon.crater });
+      if (this.craters.length > MAX_CRATERS) {
+        this.craters.shift();
+      }
     }
-    this.emit("explosion", { x: point.x, y: point.y, radius: weapon.radius, playerId: ownerId, weapon: weapon.id });
+    this.emit("explosion", { x: point.x, y: point.y, radius: weapon.radius, playerId: ownerId, weapon: weapon.id, water });
+
+    this.crates
+      .filter((crate) => Math.hypot(crate.x - point.x, crate.y - point.y) < weapon.radius * 0.8)
+      .forEach((crate) => this.loseCrate(crate, "destroyed"));
 
     const stats = this.shotStats;
     stats.explosions += 1;
@@ -508,6 +564,7 @@ export class Game {
         return;
       }
       this.applyDamage(player, damage);
+      this.knockBack(player, point, (1 - Math.min(1, distance / weapon.radius)) * (weapon.radius / WEAPONS.standard.radius));
       if (player === attacker) {
         stats.selfDamage += damage;
       } else {
@@ -541,6 +598,19 @@ export class Game {
     this.setPhase("settling", PHASE_DELAYS.settle);
   }
 
+  knockBack(player, point, strength) {
+    if (player.sunk || strength <= 0.05) {
+      return;
+    }
+    const direction = Math.sign(player.position.x - point.x) || (Math.random() < 0.5 ? -1 : 1);
+    const speed = KNOCKBACK * strength;
+    player.fall = {
+      vx: direction * speed,
+      vy: speed * 0.6,
+      peakY: Math.max(player.position.y, player.fall?.peakY ?? player.position.y),
+    };
+  }
+
   applyDamage(player, amount) {
     player.hp = Math.max(0, player.hp - amount);
     this.emit("damage", {
@@ -556,7 +626,11 @@ export class Game {
     let anyFalling = false;
 
     this.players.forEach((player) => {
-      if (isCartSupported(player.position, this.craters)) {
+      if (player.sunk) {
+        return;
+      }
+      const supported = isCartSupported(player.position, this.map, this.craters);
+      if (supported && (!player.fall || player.fall.vy <= 0)) {
         if (player.fall) {
           this.land(player);
         }
@@ -564,20 +638,41 @@ export class Game {
       }
 
       if (!player.fall) {
-        player.fall = { velocity: 0, startY: player.position.y };
+        player.fall = { vx: 0, vy: 0, peakY: player.position.y };
       }
-      player.fall.velocity = Math.min(player.fall.velocity + CART_GRAVITY * seconds, 120);
-      let remaining = player.fall.velocity * seconds;
-      while (remaining > 0) {
-        const step = Math.min(0.25, remaining);
-        remaining -= step;
-        player.position.y = Math.max(STREET_Y, player.position.y - step);
-        if (isCartSupported(player.position, this.craters)) {
-          break;
+      const fall = player.fall;
+      fall.vy = Math.max(fall.vy - CART_GRAVITY * seconds, -120);
+
+      // Deslocamento horizontal para ao bater em parede ou encosta.
+      if (fall.vx) {
+        const nextX = player.position.x + fall.vx * seconds;
+        const edge = { x: nextX + Math.sign(fall.vx) * CART_SIZE, y: player.position.y + 1 };
+        if (isSolid(edge, this.map, this.craters) || Math.abs(nextX) > 400) {
+          fall.vx = 0;
+        } else {
+          player.position.x = nextX;
         }
       }
 
-      if (isCartSupported(player.position, this.craters)) {
+      let remaining = Math.abs(fall.vy) * seconds;
+      const direction = Math.sign(fall.vy);
+      while (remaining > 0) {
+        const step = Math.min(0.25, remaining);
+        remaining -= step;
+        if (direction > 0 && isSolid({ x: player.position.x, y: player.position.y + 5 }, this.map, this.craters)) {
+          fall.vy = 0;
+          break;
+        }
+        player.position.y += direction * step;
+        if (direction < 0 && (isCartSupported(player.position, this.map, this.craters) || isCartSunk(player.position))) {
+          break;
+        }
+      }
+      fall.peakY = Math.max(fall.peakY, player.position.y);
+
+      if (isCartSunk(player.position)) {
+        this.sink(player);
+      } else if (fall.vy <= 0 && isCartSupported(player.position, this.map, this.craters)) {
         this.land(player);
       } else {
         anyFalling = true;
@@ -587,8 +682,95 @@ export class Game {
     return anyFalling;
   }
 
+  sink(player) {
+    player.fall = null;
+    player.sunk = true;
+    player.hp = 0;
+    this.status = `${player.label} afundou!`;
+    this.emit("sink", { playerId: player.id, label: player.label, x: player.position.x, y: player.position.y });
+  }
+
+  maybeDropCrate() {
+    if (this.turnsInRound < CRATES.firstTurn || this.crates.length >= CRATES.max || Math.random() >= CRATES.dropChance) {
+      return;
+    }
+    const island = randomItem(this.map.islands);
+    const type = randomItem(Object.keys(CRATES.types));
+    this.eventSeq += 1;
+    const crate = {
+      id: this.eventSeq,
+      type,
+      x: randomRange(island.left + 10, island.right - 10),
+      y: CRATES.spawnY,
+      landed: false,
+      parachute: true,
+    };
+    this.crates.push(crate);
+    this.emit("crateDrop", { crateId: crate.id, crateType: type, x: crate.x });
+  }
+
+  // Caixas descem de paraquedas, pousam no que estiver solido e afundam na agua.
+  updateCrates(dt) {
+    const seconds = dt / 1000;
+    [...this.crates].forEach((crate) => {
+      if (isSolid({ x: crate.x, y: crate.y - 1.6 }, this.map, this.craters)) {
+        if (!crate.landed) {
+          crate.landed = true;
+          crate.parachute = false;
+        }
+      } else {
+        crate.landed = false;
+        crate.y -= (crate.parachute ? CRATES.parachuteSpeed : CRATES.freeFallSpeed) * seconds;
+        if (crate.y - 1.5 <= WATER_Y) {
+          this.loseCrate(crate, "water");
+          return;
+        }
+      }
+
+      const collector = this.players.find((player) =>
+        player.hp > 0 &&
+        Math.abs(player.position.x - crate.x) < CRATES.pickupRadius &&
+        Math.abs(player.position.y + 1 - crate.y) < CRATES.pickupRadius);
+      if (collector) {
+        this.collectCrate(collector, crate);
+      }
+    });
+  }
+
+  loseCrate(crate, reason) {
+    this.crates = this.crates.filter((entry) => entry !== crate);
+    this.emit("crateLost", { crateId: crate.id, reason, x: crate.x, y: crate.y });
+  }
+
+  collectCrate(player, crate) {
+    if (!player) {
+      return;
+    }
+    this.crates = this.crates.filter((entry) => entry !== crate);
+    const spec = CRATES.types[crate.type];
+    let text;
+    if (crate.type === "hp") {
+      const before = player.hp;
+      player.hp = Math.min(MAX_HP, player.hp + spec.amount);
+      text = `+${player.hp - before} HP`;
+    } else if (crate.type === "fuel") {
+      if (this.phase === "aiming" && player === this.currentPlayer) {
+        player.fuel += spec.amount;
+      } else {
+        player.bonusFuel += spec.amount;
+      }
+      text = `+${spec.amount} combustível`;
+    } else {
+      const weaponId = randomItem(WEAPON_ORDER.filter((id) => WEAPONS[id].ammo !== null));
+      player.ammo[weaponId] += spec.amount;
+      text = `+${spec.amount} ${WEAPONS[weaponId].label}`;
+    }
+    this.status = `${player.label} pegou a caixa de ${spec.label.toLowerCase()}: ${text}.`;
+    this.emit("cratePickup", { playerId: player.id, crateType: crate.type, text, x: crate.x, y: crate.y });
+  }
+
   land(player) {
-    const distance = player.fall.startY - player.position.y;
+    const distance = player.fall.peakY - player.position.y;
     player.fall = null;
     const damage = distance > SAFE_FALL ? Math.min(30, Math.round((distance - SAFE_FALL) * 1.2)) : 0;
     this.emit("land", { playerId: player.id, x: player.position.x, y: player.position.y, distance });
@@ -670,7 +852,7 @@ export class Game {
     const attacker = this.currentPlayer;
     const target = this.opponent;
     const preset = AI_PRESETS[this.aiDifficulty];
-    const wind = this.wind * preset.windKnowledge;
+    const wind = this.wind * preset.windKnowledge * (this.modifier.aiWindScale ?? 1);
     const stateKey = this.buildAiStateKey(attacker, target);
     const previousMisses = this.aiMissMemory.get(stateKey) ?? [];
     const candidates = [];
@@ -735,7 +917,7 @@ export class Game {
     let bestDistance = Number.POSITIVE_INFINITY;
 
     for (let elapsed = simulationStep; elapsed <= 20; elapsed += simulationStep) {
-      const point = projectileAt(origin, launch, wind, elapsed);
+      const point = projectileAt(origin, launch, wind, elapsed, this.gravity);
       const distance = Math.hypot(point.x - targetCenter.x, point.y - targetCenter.y);
       bestDistance = Math.min(bestDistance, distance);
 
@@ -743,7 +925,7 @@ export class Game {
         return { hitTarget: true, score: 0 };
       }
 
-      if (isSolid(point, this.craters) || (elapsed > 0.5 && isInsidePlayerHitbox(point, attacker))) {
+      if (isInWater(point) || isSolid(point, this.map, this.craters) || (elapsed > 0.5 && isInsidePlayerHitbox(point, attacker))) {
         const selfDistance = Math.hypot(point.x - selfCenter.x, point.y - selfCenter.y);
         if (selfDistance < STANDARD.radius) {
           return { hitTarget: false, score: 300 + distance };
@@ -825,6 +1007,8 @@ export class Game {
       status: this.status,
       theme: this.theme,
       seed: this.seed,
+      modifier: this.modifier.id,
+      crates: this.crates.map((crate) => ({ ...crate })),
       wind: this.wind,
       turnTimeMs: this.turnTimeMs,
       craters: this.craters.map((crater) => ({ ...crater })),
@@ -835,6 +1019,7 @@ export class Game {
         origin: { ...projectile.origin },
         velocity: { ...projectile.velocity },
         wind: projectile.wind,
+        gravity: projectile.gravity,
         elapsed: projectile.elapsed,
         position: { ...projectile.position },
       })),
@@ -855,6 +1040,7 @@ export class Game {
         weapon: player.weapon,
         ammo: { ...player.ammo },
         falling: Boolean(player.fall),
+        sunk: player.sunk,
       })),
     };
   }
