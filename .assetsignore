@@ -1,0 +1,10 @@
+# Arquivos do repositorio que nao devem ser publicados no site
+.git
+.gitignore
+.assetsignore
+.wrangler
+node_modules
+package.json
+package-lock.json
+wrangler.jsonc
+README.md

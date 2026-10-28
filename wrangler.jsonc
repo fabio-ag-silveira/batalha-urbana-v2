@@ -1,0 +1,10 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "batalha-urbana",
+  "compatibility_date": "2026-10-28",
+  // Site 100% estatico: sem "main", o Worker so serve os arquivos abaixo.
+  "assets": {
+    "directory": ".",
+    "not_found_handling": "404-page"
+  }
+}

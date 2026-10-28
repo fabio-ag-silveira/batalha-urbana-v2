@@ -4,13 +4,23 @@ Migracao do projeto original em C++ para uma versao web moderna com `HTML + CSS 
 
 ## Como executar
 
-No terminal, dentro de `c:eposatalha-urbana`, execute:
+Esta versão é um site 100% estático (HTML + CSS + JS), publicado no **Cloudflare Workers** com Static Assets. Não há servidor nem modo LAN.
 
 ```powershell
-node server.js
+npm install      # instala o wrangler (só na primeira vez)
+npm run dev      # servidor local em http://127.0.0.1:8787
 ```
 
-Depois abra `http://127.0.0.1:8000`. O mesmo servidor entrega o jogo e as salas do modo LAN. Para parar, use `Ctrl + C`.
+## Publicar no Cloudflare Workers
+
+```powershell
+npx wrangler login   # abre o navegador para entrar na sua conta Cloudflare
+npm run deploy       # publica em https://batalha-urbana.<sua-conta>.workers.dev
+```
+
+Para usar um domínio próprio, o domínio precisa estar na sua conta Cloudflare. Depois, no painel, vá em **Workers & Pages → batalha-urbana → Settings → Domains & Routes → Add → Custom domain**.
+
+A configuração fica em [wrangler.jsonc](/c:/repos/batalha-urbana/wrangler.jsonc). O arquivo [.assetsignore](/c:/repos/batalha-urbana/.assetsignore) lista o que não deve ser publicado (README, `node_modules`, configs).
 
 ## Como jogar
 
@@ -20,7 +30,7 @@ Cada jogador começa a rodada com 100 HP. Vence a rodada quem destruir o carrinh
 |---|---|---|---|
 | Player 1 | W/S | A/D | segure F e solte |
 | Player 2 | I/K | J/L | segure H e solte |
-| Jogador da vez (vs IA / LAN) | ↑/↓ | ←/→ | segure Espaço e solte |
+| Jogador da vez (vs IA) | ↑/↓ | ←/→ | segure Espaço e solte |
 
 - **Força:** segurar o disparo enche a barra em vai-e-vem; soltar atira. A marca branca mostra a força do tiro anterior.
 - **Vento:** muda a cada turno e aparece no painel do topo (as nuvens também seguem o vento).
@@ -30,36 +40,9 @@ Cada jogador começa a rodada com 100 HP. Vence a rodada quem destruir o carrinh
 - **Timer:** 20 s por turno. Se acabar durante a carga, o tiro sai com a força atual; senão, a vez passa.
 - **Atalhos:** `B` reinicia, `M` alterna IA/local, `N` muda a dificuldade da IA, `U` liga/desliga o som.
 
-## Modo LAN
-
-Para o modo LAN com salas automaticas no mesmo servidor, use:
-
-```powershell
-node server.js
-```
-
-Depois:
-
-1. O host abre `http://127.0.0.1:8000`, entra em `LAN` e clica em `Criar sala`.
-2. O amigo abre o endereco do host no navegador.
-
-Com Hamachi ou Radmin, o amigo deve abrir:
-
-`http://IP_DO_HOST_NA_REDE_VIRTUAL:8000`
-
-3. Na tela `LAN`, as salas abertas aparecem automaticamente na lista.
-4. O amigo clica na sala disponivel para entrar.
-5. Cada navegador assume automaticamente `Player 1` ou `Player 2`.
-
-Observacoes:
-
-- Nao e necessario preencher porta ou codigo manualmente para entrar, desde que ambos estejam acessando o mesmo servidor.
-- O campo `Servidor` so precisa ser alterado se voce abrir a interface a partir de outro endereco e quiser consultar um host diferente.
-- O modo LAN atual funciona bem para rede local, Hamachi e Radmin porque ambos acessam o mesmo servidor HTTP do host.
-
 ## Estrutura
 
-- [src/game.js](/c:/repos/batalha-urbana/src/game.js): estado da partida, fases do turno, entrada, dano, quedas e IA. Não usa DOM, então roda também no `server.js`.
+- [src/game.js](/c:/repos/batalha-urbana/src/game.js): estado da partida, fases do turno, entrada, dano, quedas e IA.
 - [src/physics.js](/c:/repos/batalha-urbana/src/physics.js): trajetória com vento, colisão com prédios/crateras e apoio dos carrinhos.
 - [src/scene.js](/c:/repos/batalha-urbana/src/scene.js): céu, cidade, carrinhos, projétil e painel do topo.
 - [src/renderer.js](/c:/repos/batalha-urbana/src/renderer.js): renderer Canvas, conversão de coordenadas e camadas em cache.

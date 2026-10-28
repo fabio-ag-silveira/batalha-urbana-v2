@@ -174,14 +174,6 @@ h1 {
   overflow: hidden;
 }
 
-.control-group.lan-group {
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  overflow: hidden;
-}
-
 .control-title {
   margin: 0 0 6px;
   font-size: 0.76rem;
@@ -194,99 +186,6 @@ h1 {
   flex-wrap: wrap;
   gap: 6px;
   flex-shrink: 0;
-}
-
-.lan-fields {
-  display: grid;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.lan-fields + .button-row {
-  margin-top: 8px;
-}
-
-.field-label {
-  font-size: 0.64rem;
-  font-weight: 700;
-  color: var(--muted);
-}
-
-.hud-input {
-  width: 100%;
-  border: 1px solid var(--button-border);
-  background: #1d2129;
-  color: var(--text);
-  border-radius: 14px;
-  padding: 8px 11px;
-  font: inherit;
-  font-size: 0.78rem;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.hud-input::placeholder {
-  color: #7f8a99;
-}
-
-.room-list {
-  display: grid;
-  gap: 6px;
-  margin-top: 8px;
-  flex: 1 1 auto;
-  min-height: 0;
-  max-height: min(26vh, 220px);
-  overflow: auto;
-  padding-right: 2px;
-  align-content: start;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
-}
-
-.room-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.room-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-}
-
-.room-item {
-  display: grid;
-  gap: 3px;
-  text-align: left;
-  width: 100%;
-  border: 1px solid var(--button-border);
-  background: #1d2129;
-  color: var(--text);
-  border-radius: 14px;
-  padding: 8px 10px;
-  cursor: pointer;
-}
-
-.room-item:hover {
-  border-color: rgba(255, 255, 255, 0.16);
-}
-
-.room-item.is-full {
-  opacity: 0.56;
-  cursor: default;
-}
-
-.room-item.is-own-room {
-  border-color: rgba(255, 255, 255, 0.14);
-  background: #262b35;
-}
-
-.room-item-title {
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.room-item-meta,
-.room-empty {
-  font-size: 0.68rem;
-  color: var(--muted);
 }
 
 .hud-button {
@@ -447,14 +346,6 @@ canvas {
   .hud-card.controls-card {
     display: block;
     overflow: visible;
-  }
-
-  .control-group.lan-group {
-    overflow: visible;
-  }
-
-  .room-list {
-    max-height: 180px;
   }
 
   .stage-shell {

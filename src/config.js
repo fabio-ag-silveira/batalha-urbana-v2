@@ -20,7 +20,6 @@ export const PLAYER_HITBOX = { halfWidth: 4, minY: -2, maxY: 6 };
 export const GAME_MODES = {
   local: "local",
   ai: "ai",
-  lan: "lan",
 };
 
 export const AI_DIFFICULTIES = {

@@ -91,7 +91,6 @@ function setAim(player, facing, elevation) {
 
 export class Game {
   constructor() {
-    this.instanceId = Math.random().toString(36).slice(2, 10);
     this.mode = DEFAULT_GAME_MODE;
     this.aiDifficulty = DEFAULT_AI_DIFFICULTY;
     this.events = [];
@@ -164,9 +163,7 @@ export class Game {
     this.aiThinkMs = AI_THINK_DELAY_MS;
     this.status = this.mode === GAME_MODES.ai
       ? "Modo versus IA ativado."
-      : this.mode === GAME_MODES.lan
-        ? "Modo LAN ativado."
-        : "Modo versus local ativado.";
+      : "Modo versus local ativado.";
   }
 
   setAiDifficulty(difficulty) {
@@ -692,7 +689,6 @@ export class Game {
   getSnapshot() {
     const projectile = this.projectile;
     return {
-      instanceId: this.instanceId,
       mode: this.mode,
       aiDifficulty: this.aiDifficulty,
       phase: this.phase,
@@ -733,18 +729,5 @@ export class Game {
         falling: Boolean(player.fall),
       })),
     };
-  }
-
-  applyNetworkCommand(playerId, command) {
-    if (command === "reset") {
-      this.resetGame();
-      return true;
-    }
-
-    if (![1, 2].includes(playerId) || command?.type !== "input") {
-      return false;
-    }
-
-    return this.setInput(playerId, command.control, Boolean(command.pressed), { cancel: Boolean(command.cancel) });
   }
 }
