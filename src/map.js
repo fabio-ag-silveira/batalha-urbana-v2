@@ -347,6 +347,24 @@ function validPairs(points) {
   return pairs;
 }
 
+// Prédios de periferia além das paredes laterais: só cenário (sem colisão), para a
+// câmera afastada não mostrar vazio nas bordas do mapa.
+function generateOutskirts(rng, map) {
+  const buildings = [];
+  [-1, 1].forEach((side) => {
+    let cursor = 201;
+    while (cursor < 400) {
+      const type = pickBuildingType(rng);
+      const halfWidth = type === "tower" ? between(rng, [4, 7]) : between(rng, [5, 10]);
+      const scaleY = type === "tower" ? between(rng, [0.9, 1.25]) : between(rng, [0.8, 1.7]);
+      const x = side * (cursor + halfWidth);
+      buildings.push(createBuilding(type, x, footprint(map, x, halfWidth).low - 3, scaleY, halfWidth));
+      cursor += halfWidth * 2 + (rng() < 0.2 ? between(rng, [8, 14]) : between(rng, [1, 4]));
+    }
+  });
+  return buildings;
+}
+
 function buildMap(seed) {
   const rng = createRng(seed);
   const map = { seed, ground: generateGround(rng), islands: [], colliders: [], spawnPoints: [] };
@@ -357,6 +375,7 @@ function buildMap(seed) {
     ...map.islands.flatMap((island) => island.buildings.flatMap((building) => building.colliders)),
   ];
   map.spawnPoints = findSpawnPoints(map);
+  map.outskirts = generateOutskirts(rng, map);
   return map;
 }
 

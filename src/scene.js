@@ -471,6 +471,7 @@ function drawWorld(renderer, state, theme, map) {
 
   renderer.drawLayer("world", version, (context) => {
     const rng = createRng(state.seed);
+    map.outskirts.forEach((building) => drawBuilding(renderer, building, theme, rng));
     map.city.buildings.forEach((building) => drawBuilding(renderer, building, theme, rng));
     drawGround(renderer, theme, map);
     map.islands.forEach((island) => drawFloatingIsland(renderer, island, theme, rng, nightLights));
