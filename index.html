@@ -13,76 +13,90 @@
 <body>
   <main class="app-shell">
     <section class="hud" id="hud" aria-label="Menu da partida">
-      <div class="hud-card">
-        <button type="button" class="hud-button hud-close" id="menuClose">Fechar</button>
-        <p class="eyebrow">Estado da partida</p>
-        <h1>Batalha Urbana</h1>
-        <p id="roundLabel" class="round-label"></p>
+      <header class="hud-header">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <div>
+            <h1>Batalha Urbana</h1>
+            <p id="roundLabel" class="hud-meta"></p>
+          </div>
+        </div>
+        <button type="button" class="icon-button hud-close" id="menuClose" aria-label="Fechar menu">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+
+      <div class="hud-section">
         <p id="turnLabel" class="turn-label"></p>
         <p id="statusLabel" class="status-label"></p>
       </div>
 
-      <div class="hud-card controls-card">
-        <p class="eyebrow">Controles de partida</p>
-        <div class="control-group">
-          <p class="control-title">Modo</p>
-          <div class="button-row" id="modeButtons">
-            <button type="button" class="hud-button" data-mode="ai">Versus IA</button>
-            <button type="button" class="hud-button" data-mode="local">Versus Local</button>
+      <div class="hud-section scoreboard" aria-label="Placar">
+        <article class="player-row player-one">
+          <div class="player-head">
+            <span class="player-dot" aria-hidden="true"></span>
+            <span class="player-name">Player 1</span>
+            <span id="playerOneRounds" class="round-dots"></span>
           </div>
-        </div>
-        <div class="control-group">
-          <p class="control-title">Dificuldade IA</p>
-          <div class="button-row" id="difficultyButtons">
-            <button type="button" class="hud-button" data-difficulty="easy">Fácil</button>
-            <button type="button" class="hud-button" data-difficulty="medium">Média</button>
-            <button type="button" class="hud-button" data-difficulty="hard">Difícil</button>
-          </div>
-        </div>
-        <div class="control-group">
-          <p class="control-title">Partida</p>
-          <div class="button-row">
-            <button type="button" class="hud-button" id="resetButton">Nova partida</button>
-            <button type="button" class="hud-button" id="soundButton">Som: ligado</button>
-            <button type="button" class="hud-button" id="cameraButton">Câmera: dinâmica</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="hud-grid">
-        <article class="hud-card player-card player-one">
-          <p class="eyebrow">Player 1</p>
-          <div id="playerOneStats" class="stats-panel"></div>
-          <div class="shortcut-list">
-            <span class="shortcut-pill"><strong>W/S</strong> mira</span>
-            <span class="shortcut-pill"><strong>A/D</strong> move</span>
-            <span class="shortcut-pill"><strong>F</strong> segure e solte</span>
-            <span class="shortcut-pill"><strong>Q</strong> arma</span>
-          </div>
+          <div id="playerOneStats"></div>
         </article>
-
-        <article class="hud-card player-card player-two">
-          <p class="eyebrow">Player 2</p>
-          <div id="playerTwoStats" class="stats-panel"></div>
-          <div class="shortcut-list">
-            <span class="shortcut-pill"><strong>I/K</strong> mira</span>
-            <span class="shortcut-pill"><strong>J/L</strong> move</span>
-            <span class="shortcut-pill"><strong>H</strong> segure e solte</span>
-            <span class="shortcut-pill"><strong>O</strong> arma</span>
+        <article class="player-row player-two">
+          <div class="player-head">
+            <span class="player-dot" aria-hidden="true"></span>
+            <span class="player-name">Player 2</span>
+            <span id="playerTwoRounds" class="round-dots"></span>
           </div>
+          <div id="playerTwoStats"></div>
         </article>
       </div>
 
-      <div class="hud-card footer-card">
-        <p class="eyebrow">Atalhos</p>
-        <div class="shortcut-list compact">
-          <span class="shortcut-pill"><strong>Setas + Espaço + Tab</strong> jogador da vez</span>
-          <span class="shortcut-pill"><strong>C</strong> câmera</span>
-          <span class="shortcut-pill"><strong>M</strong> troca modo</span>
-          <span class="shortcut-pill"><strong>N</strong> muda IA</span>
-          <span class="shortcut-pill"><strong>U</strong> som</span>
-          <span class="shortcut-pill"><strong>B</strong> reinicia</span>
+      <div class="hud-section settings">
+        <div class="field">
+          <span class="field-label">Modo</span>
+          <div class="segmented" id="modeButtons" role="group" aria-label="Modo">
+            <button type="button" data-mode="ai">Versus IA</button>
+            <button type="button" data-mode="local">Local</button>
+          </div>
         </div>
+        <div class="field">
+          <span class="field-label">Dificuldade da IA</span>
+          <div class="segmented" id="difficultyButtons" role="group" aria-label="Dificuldade da IA">
+            <button type="button" data-difficulty="easy">Fácil</button>
+            <button type="button" data-difficulty="medium">Média</button>
+            <button type="button" data-difficulty="hard">Difícil</button>
+          </div>
+        </div>
+        <div class="toggle-list">
+          <button type="button" class="toggle" id="soundButton" aria-pressed="true">
+            <span>Som</span><span class="switch" aria-hidden="true"></span>
+          </button>
+          <button type="button" class="toggle" id="cameraButton" aria-pressed="true">
+            <span>Câmera dinâmica</span><span class="switch" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="hud-section hud-help">
+        <details>
+          <summary>Controles do teclado</summary>
+          <table class="key-table">
+            <thead>
+              <tr><th></th><th>Player 1</th><th>Player 2</th><th>Da vez</th></tr>
+            </thead>
+            <tbody>
+              <tr><th>Mirar</th><td><kbd>W</kbd><kbd>S</kbd></td><td><kbd>I</kbd><kbd>K</kbd></td><td><kbd>↑</kbd><kbd>↓</kbd></td></tr>
+              <tr><th>Mover</th><td><kbd>A</kbd><kbd>D</kbd></td><td><kbd>J</kbd><kbd>L</kbd></td><td><kbd>←</kbd><kbd>→</kbd></td></tr>
+              <tr><th>Atirar</th><td><kbd>F</kbd></td><td><kbd>H</kbd></td><td><kbd>Espaço</kbd></td></tr>
+              <tr><th>Arma</th><td><kbd>Q</kbd></td><td><kbd>O</kbd></td><td><kbd>Tab</kbd></td></tr>
+            </tbody>
+          </table>
+          <p class="key-note">Segure o tiro para carregar a força e solte para disparar.</p>
+          <p class="key-note"><kbd>B</kbd> nova partida · <kbd>M</kbd> modo · <kbd>N</kbd> dificuldade · <kbd>U</kbd> som · <kbd>C</kbd> câmera</p>
+        </details>
+      </div>
+
+      <div class="hud-footer">
+        <button type="button" class="primary-button" id="resetButton">Nova partida</button>
       </div>
     </section>
 

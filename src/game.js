@@ -294,7 +294,7 @@ export class Game {
     player.fuel = FUEL_PER_TURN + player.bonusFuel;
     player.bonusFuel = 0;
     this.setPhase("aiming");
-    this.status = `Vez de ${player.label}. Mire, ajuste a força e atire!`;
+    this.status = "Mire, ajuste a força e atire!";
     this.emit("turn", { playerId: player.id, label: player.label, wind: this.wind });
     this.maybeDropCrate();
   }

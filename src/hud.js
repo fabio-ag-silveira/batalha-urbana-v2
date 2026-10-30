@@ -7,28 +7,31 @@ const PHASE_LABELS = {
   roundOver: "Fim da rodada",
 };
 
-function renderStats(player, roundsWon) {
+function renderStats(player) {
   const hpPercent = Math.max(0, (player.hp / MAX_HP) * 100);
   const weapon = WEAPONS[player.weapon];
   const ammo = player.ammo[player.weapon];
   return `
-    <div class="hp-row">
-      <div class="hp-bar"><span class="hp-fill" style="width: ${hpPercent}%"></span></div>
-      <span class="hp-value">${player.hp} HP</span>
+    <div class="hp-line">
+      <div class="hp-track"><span class="hp-fill" style="width: ${hpPercent}%"></span></div>
+      <span class="hp-number">${player.hp}</span>
     </div>
-    <div class="stat-chip">
-      <span class="stat-label">Rodadas</span>
-      <span class="stat-value">${roundsWon}/${ROUNDS_TO_WIN}</span>
-    </div>
-    <div class="stat-chip">
-      <span class="stat-label">Ângulo</span>
-      <span class="stat-value">${Math.round(player.elevation)}°</span>
-    </div>
-    <div class="stat-chip">
-      <span class="stat-label">Arma</span>
-      <span class="stat-value">${weapon.icon} ${weapon.label}${ammo === null ? "" : ` ×${ammo}`}</span>
+    <div class="player-meta">
+      <span>${Math.round(player.elevation)}°</span>
+      <span>·</span>
+      <span>${weapon.icon} ${weapon.label}${ammo === null ? "" : ` ×${ammo}`}</span>
     </div>
   `;
+}
+
+function renderRounds(won) {
+  return Array.from({ length: ROUNDS_TO_WIN }, (_, index) =>
+    `<span class="round-dot${index < won ? " is-won" : ""}"></span>`).join("");
+}
+
+function setPressed(button, pressed) {
+  button.classList.toggle("is-active", pressed);
+  button.setAttribute("aria-pressed", String(pressed));
 }
 
 // Painel lateral desenhado a partir do snapshot; so toca no DOM quando algo muda.
@@ -64,32 +67,28 @@ export class Hud {
     this.write("round", (value) => { ui.roundLabel.textContent = value; }, roundText);
     this.write("turn", (value) => { ui.turnLabel.textContent = value; }, turnText);
     this.write("status", (value) => { ui.statusLabel.textContent = value; }, state.status);
-    this.write("p1", (value) => { ui.playerOneStats.innerHTML = value; }, renderStats(state.players[0], state.totalScore[0]));
-    this.write("p2", (value) => { ui.playerTwoStats.innerHTML = value; }, renderStats(state.players[1], state.totalScore[1]));
+    this.write("p1", (value) => { ui.playerOneStats.innerHTML = value; }, renderStats(state.players[0]));
+    this.write("p2", (value) => { ui.playerTwoStats.innerHTML = value; }, renderStats(state.players[1]));
+    this.write("p1rounds", (value) => { ui.playerOneRounds.innerHTML = value; }, renderRounds(state.totalScore[0]));
+    this.write("p2rounds", (value) => { ui.playerTwoRounds.innerHTML = value; }, renderRounds(state.totalScore[1]));
     this.write("active", (value) => {
       ui.playerOneCard?.classList.toggle("is-turn", value === "1");
       ui.playerTwoCard?.classList.toggle("is-turn", value === "2");
     }, state.phase === "aiming" ? String(current.id) : "");
     this.write("mode", (value) => {
-      ui.modeButtons.forEach((button) => button.classList.toggle("is-active", button.dataset.mode === value));
+      ui.modeButtons.forEach((button) => setPressed(button, button.dataset.mode === value));
     }, mode);
     this.write("difficulty", (value) => {
       ui.difficultyButtons.forEach((button) => {
-        button.classList.toggle("is-active", mode === GAME_MODES.ai && button.dataset.difficulty === aiDifficulty);
+        setPressed(button, mode === GAME_MODES.ai && button.dataset.difficulty === aiDifficulty);
         button.disabled = mode !== GAME_MODES.ai;
       });
     }, `${mode}:${aiDifficulty}`);
     this.write("sound", (value) => {
-      if (ui.soundButton) {
-        ui.soundButton.textContent = value ? "Som: ligado" : "Som: desligado";
-        ui.soundButton.classList.toggle("is-active", value);
-      }
+      setPressed(ui.soundButton, value);
     }, soundEnabled);
     this.write("camera", (value) => {
-      if (ui.cameraButton) {
-        ui.cameraButton.textContent = value ? "Câmera: dinâmica" : "Câmera: fixa";
-        ui.cameraButton.classList.toggle("is-active", value);
-      }
+      setPressed(ui.cameraButton, value);
     }, cameraEnabled);
   }
 }

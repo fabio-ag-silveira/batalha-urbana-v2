@@ -17,6 +17,8 @@ const ui = {
   statusLabel: document.getElementById("statusLabel"),
   playerOneStats: document.getElementById("playerOneStats"),
   playerTwoStats: document.getElementById("playerTwoStats"),
+  playerOneRounds: document.getElementById("playerOneRounds"),
+  playerTwoRounds: document.getElementById("playerTwoRounds"),
   playerOneCard: document.querySelector(".player-one"),
   playerTwoCard: document.querySelector(".player-two"),
   modeButtons: Array.from(document.querySelectorAll("[data-mode]")),
