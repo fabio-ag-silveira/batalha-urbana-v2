@@ -346,7 +346,8 @@ export class Effects {
     const pop = 1 + Math.max(0, 0.25 - elapsed) * 1.2;
     const size = Math.round((banner.small ? 22 : 38) * pop);
     // Sempre abaixo do painel do topo e do selo de modificador.
-    const y = Math.max(renderer.height * (banner.small ? 0.24 : 0.32), banner.small ? 112 : 130);
+    const hudBottom = renderer.hudBottom ?? 80;
+    const y = Math.max(renderer.height * (banner.small ? 0.24 : 0.32), hudBottom + (banner.small ? 30 : 48));
 
     renderer.drawText(banner.text, renderer.width / 2, y, {
       font: `800 ${size}px ${FONT}`,

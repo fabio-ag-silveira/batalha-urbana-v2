@@ -797,10 +797,13 @@ function drawTurnTimer(renderer, state, x, y, time) {
   });
 }
 
+// Em tela estreita (celular em pe) o painel ocupa a largura e desce para baixo
+// dos botoes de menu e tela cheia, que ficam nos cantos.
 function drawOverlay(renderer, state, time) {
-  const panelWidth = 340;
+  const narrow = renderer.width < 460;
+  const panelWidth = Math.min(340, renderer.width - 24);
   const left = renderer.width / 2 - panelWidth / 2;
-  const top = 12;
+  const top = narrow ? 60 : 12;
   const [playerOne, playerTwo] = state.players;
 
   renderer.drawRoundedRect(left, top, panelWidth, 54, 16, {
@@ -810,8 +813,9 @@ function drawOverlay(renderer, state, time) {
   drawScoreDots(renderer, left + 42, top + 24, state.totalScore[0], playerOne.color, "P1");
   drawScoreDots(renderer, left + panelWidth - 42, top + 24, state.totalScore[1], playerTwo.color, "P2");
   const modifier = ROUND_MODIFIERS[state.modifier] ?? ROUND_MODIFIERS.normal;
-  drawWindIndicator(renderer, state.wind, left + 138, top, Boolean(modifier.hideWind));
-  drawTurnTimer(renderer, state, left + 218, top + 27, time);
+  drawWindIndicator(renderer, state.wind, left + panelWidth * 0.405, top, Boolean(modifier.hideWind));
+  drawTurnTimer(renderer, state, left + panelWidth * 0.64, top + 27, time);
+  renderer.hudBottom = top + 54 + (modifier.id !== "normal" ? 28 : 0);
 
   if (modifier.id !== "normal") {
     const label = modifier.label.toUpperCase();

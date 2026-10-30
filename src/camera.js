@@ -6,8 +6,9 @@ const MAX_ZOOM = 2.4;
 // Abaixo de 1 a camera se afasta para caber ilhas altas em telas largas e baixas.
 const MIN_ZOOM = 0.55;
 const MARGIN_X = 9;
-// Espaco acima do ponto mais alto para nome, barra de HP e seta do carrinho.
-const MARGIN_TOP = 12;
+const MARGIN_TOP = 3;
+// Pixels acima do carrinho ocupados por nome, barra de HP, seta e barra de forca.
+const TAG_ROOM_PX = 74;
 const STORAGE_KEY = "batalha_urbana_camera";
 const WIDE_PHASES = ["roundStart", "roundOver", "matchOver"];
 
@@ -55,13 +56,16 @@ export class CameraController {
     }
   }
 
-  frame(points, viewHeight, maxZoom) {
+  // O ponto mais alto precisa ficar abaixo do painel do topo, com folga para a etiqueta do carrinho.
+  frame(points, renderer, maxZoom) {
     const view = points.map(toView);
     const minX = Math.min(...view.map((point) => point.x)) - MARGIN_X;
     const maxX = Math.max(...view.map((point) => point.x)) + MARGIN_X;
     const maxY = Math.max(...view.map((point) => point.y)) + MARGIN_TOP;
+    const reservedPx = (renderer.hudBottom ?? 80) + TAG_ROOM_PX;
+    const usable = Math.max(0.3, 1 - reservedPx / renderer.height);
     const zoomX = VIEW_WIDTH / Math.max(1, maxX - minX);
-    const zoomY = viewHeight / Math.max(1, maxY - VIEW_BOUNDS.minY);
+    const zoomY = (renderer.viewHeight * usable) / Math.max(1, maxY - VIEW_BOUNDS.minY);
     return {
       zoom: Math.min(maxZoom, Math.max(MIN_ZOOM, Math.min(zoomX, zoomY))),
       centerX: (minX + maxX) / 2,
@@ -69,24 +73,24 @@ export class CameraController {
   }
 
   // Visao geral: o mapa inteiro, com todas as ilhas e os dois carrinhos.
-  overview(state, viewHeight) {
+  overview(state, renderer) {
     const points = [{ x: -200, y: 0 }, { x: 200, y: 0 }];
-    getMap(state.seed).islands.forEach((island) => points.push({ x: island.left, y: island.topY + 8 }));
-    state.players.forEach((player) => points.push({ x: player.position.x, y: player.position.y + 12 }));
-    return this.frame(points, viewHeight, 1);
+    getMap(state.seed).islands.forEach((island) => points.push({ x: island.left, y: island.topY + 4 }));
+    state.players.forEach((player) => points.push({ x: player.position.x, y: player.position.y + 6 }));
+    return this.frame(points, renderer, 1);
   }
 
-  computeTarget(state, viewHeight) {
+  computeTarget(state, renderer) {
     if (!this.enabled || WIDE_PHASES.includes(state.phase)) {
-      return this.overview(state, viewHeight);
+      return this.overview(state, renderer);
     }
 
-    const points = state.players.map((player) => ({ x: player.position.x, y: player.position.y + 12 }));
+    const points = state.players.map((player) => ({ x: player.position.x, y: player.position.y + 6 }));
     state.projectiles.forEach((projectile) => points.push(projectile.position));
     if (this.focus) {
       points.push(this.focus);
     }
-    return this.frame(points, viewHeight, MAX_ZOOM);
+    return this.frame(points, renderer, MAX_ZOOM);
   }
 
   update(dt, state, renderer) {
@@ -95,7 +99,7 @@ export class CameraController {
       this.focus = null;
     }
 
-    const target = this.computeTarget(state, renderer.viewHeight);
+    const target = this.computeTarget(state, renderer);
     const speed = state.phase === "flying" ? 5 : 2.5;
     const blend = 1 - Math.exp(-dt * speed);
     // Interpolar o zoom em escala logaritmica deixa a aproximacao uniforme.

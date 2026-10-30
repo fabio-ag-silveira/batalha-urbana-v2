@@ -604,6 +604,30 @@ body.touch .touch-controls {
   }
 }
 
+@media (max-width: 560px) {
+  .touch-controls {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 8px;
+  }
+
+  .touch-group {
+    flex: 1 1 100%;
+    gap: 8px;
+  }
+
+  .touch-group .touch-button {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    height: 50px;
+  }
+
+  .touch-group .touch-fire {
+    flex: 1.7 1 0;
+  }
+}
+
 @media (max-height: 420px) {
   .touch-controls {
     padding-top: 6px;
