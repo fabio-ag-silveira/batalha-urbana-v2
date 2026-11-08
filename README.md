@@ -22,6 +22,8 @@ Para usar um domínio próprio, o domínio precisa estar na sua conta Cloudflare
 
 A configuração fica em [wrangler.jsonc](/c:/repos/batalha-urbana/wrangler.jsonc). O arquivo [.assetsignore](/c:/repos/batalha-urbana/.assetsignore) lista o que não deve ser publicado (README, `node_modules`, configs).
 
+Alternativa sem o upload de Static Assets (útil em redes/proxies que bloqueiam esse upload): `npm run deploy:worker` gera `dist-worker/worker.js` com os arquivos do jogo embutidos no próprio script ([scripts/build-worker.mjs](scripts/build-worker.mjs)) e publica com [wrangler.worker.jsonc](wrangler.worker.jsonc), no mesmo Worker e domínio. Os dois jeitos servem o mesmo site; o último `deploy` usado é o que fica no ar.
+
 ## Como jogar
 
 Cada rodada gera um **mapa novo** a partir de uma seed:

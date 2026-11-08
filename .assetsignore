@@ -8,3 +8,6 @@ package.json
 package-lock.json
 wrangler.jsonc
 README.md
+scripts
+dist-worker
+wrangler.worker.jsonc

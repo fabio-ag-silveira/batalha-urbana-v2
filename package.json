@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "build:worker": "node scripts/build-worker.mjs",
+    "deploy:worker": "node scripts/build-worker.mjs && wrangler deploy --config wrangler.worker.jsonc"
   },
   "devDependencies": {
     "wrangler": "^4.154.0"

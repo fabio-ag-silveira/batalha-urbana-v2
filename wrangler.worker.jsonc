@@ -1,0 +1,11 @@
+{
+  // Alternativa ao wrangler.jsonc: publica um Worker com os arquivos do jogo embutidos no script,
+  // sem o upload separado de "static assets". Use: npm run deploy:worker
+  "name": "batalha-urbana",
+  "main": "./dist-worker/worker.js",
+  "compatibility_date": "2025-09-01",
+  "workers_dev": false,
+  "routes": [
+    { "pattern": "batalha.fabiosilveira.dev", "custom_domain": true }
+  ]
+}
