@@ -1,5 +1,6 @@
 import {
   AI_DIFFICULTIES,
+  AI_PLANNER,
   AI_PRESETS,
   AI_THINK_DELAY_MS,
   AIM_SPEED,
@@ -579,9 +580,8 @@ export class Game {
       this.status = "O tiro saiu do mapa.";
     }
 
-    if (dealt === 0) {
-      this.rememberAiMiss();
-    }
+    // Todo tiro serve de referencia para a IA corrigir a mira (nao so os que erram por completo).
+    this.rememberAiMiss();
     this.setPhase("settling", PHASE_DELAYS.settle);
   }
 
@@ -821,38 +821,36 @@ export class Game {
     const attacker = this.currentPlayer;
     const target = this.opponent;
     const preset = AI_PRESETS[this.aiDifficulty];
-    const wind = this.wind * preset.windKnowledge * (this.modifier.aiWindScale ?? 1);
     const stateKey = this.buildAiStateKey(attacker, target);
-    const previousMisses = this.aiMissMemory.get(stateKey) ?? [];
+    const misses = this.aiMissMemory.get(stateKey)?.length ?? 0;
+    // A cada tiro a IA tambem "le" melhor o vento (o erro de vento e sistematico, nao some com sorte).
+    const baseKnowledge = preset.windKnowledge * (this.modifier.aiWindScale ?? 1);
+    const knowledge = 1 - (1 - baseKnowledge) * preset.learning ** misses;
+    const wind = this.wind * knowledge;
     const candidates = [];
     let selected = null;
 
     search:
-    for (let angle = -87; angle <= 87; angle += preset.angleStep) {
-      for (let velocity = POWER_MIN_VELOCITY; velocity <= POWER_MAX_VELOCITY; velocity += preset.velocityStep) {
-        const result = this.simulateShot(attacker, target, angle, velocity, wind, preset.simulationStep);
+    for (let angle = -87; angle <= 87; angle += AI_PLANNER.angleStep) {
+      for (let velocity = POWER_MIN_VELOCITY; velocity <= POWER_MAX_VELOCITY; velocity += AI_PLANNER.velocityStep) {
+        const result = this.simulateShot(attacker, target, angle, velocity, wind, AI_PLANNER.simulationStep);
         if (result.hitTarget) {
           selected = { angle, velocity, score: 0 };
           break search;
         }
-        const repeatedMissPenalty = previousMisses.some((shot) => shot.angle === angle && shot.velocity === velocity)
-          ? 250
-          : 0;
-        candidates.push({ angle, velocity, score: result.score + repeatedMissPenalty });
+        candidates.push({ angle, velocity, score: result.score });
       }
     }
 
     if (!selected) {
       candidates.sort((a, b) => a.score - b.score);
-      let bestShot = candidates[0] ?? { angle: attacker.angle, velocity: 40, score: Number.POSITIVE_INFINITY };
-      if (preset.refinement) {
-        bestShot = this.refineAiShot(attacker, target, bestShot, wind);
-      }
-      const pool = candidates.slice(0, Math.max(1, preset.candidatePool));
-      selected = preset.refinement ? bestShot : pool[Math.floor(Math.random() * pool.length)] ?? bestShot;
+      const bestShot = candidates[0] ?? { angle: attacker.angle, velocity: 40, score: Number.POSITIVE_INFINITY };
+      selected = this.refineAiShot(attacker, target, bestShot, wind);
     }
 
-    const shot = this.applyAiImprecision(selected, preset);
+    // Erro humano: diminui a cada tiro contra o mesmo alvo, ate o minimo da dificuldade.
+    const scale = Math.max(preset.minError, preset.learning ** misses);
+    const shot = this.applyAiImprecision(selected, preset, scale);
     const aim = angleToAim(shot.angle);
     return {
       ...shot,
@@ -861,6 +859,7 @@ export class Game {
       elevation: clamp(aim.elevation, ELEVATION_LIMITS.min, ELEVATION_LIMITS.max),
       power: velocityToPower(shot.velocity),
       stateKey,
+      expectedMiss: selected.score,
     };
   }
 
@@ -913,11 +912,11 @@ export class Game {
   refineAiShot(attacker, target, seedShot, wind) {
     let bestShot = { ...seedShot };
 
-    for (let angle = seedShot.angle - 6; angle <= seedShot.angle + 6; angle += 1) {
-      for (let velocity = seedShot.velocity - 4; velocity <= seedShot.velocity + 4; velocity += 0.5) {
+    for (let angle = seedShot.angle - 4; angle <= seedShot.angle + 4; angle += 1) {
+      for (let velocity = seedShot.velocity - 3; velocity <= seedShot.velocity + 3; velocity += 0.5) {
         const clampedAngle = clamp(angle, -87, 87);
         const clampedVelocity = clamp(velocity, POWER_MIN_VELOCITY, POWER_MAX_VELOCITY);
-        const result = this.simulateShot(attacker, target, clampedAngle, clampedVelocity, wind, 0.02);
+        const result = this.simulateShot(attacker, target, clampedAngle, clampedVelocity, wind, 0.03);
         if (result.hitTarget) {
           return { angle: clampedAngle, velocity: clampedVelocity, score: 0 };
         }
@@ -930,13 +929,15 @@ export class Game {
     return bestShot;
   }
 
-  applyAiImprecision(shot, preset) {
-    const angleOffset = (Math.random() * 2 - 1) * preset.aimJitter.angle;
-    const velocityOffset = (Math.random() * 2 - 1) * preset.aimJitter.velocity;
+  // Desvio com distribuicao normal: erros pequenos sao comuns e grandes sao raros, como numa pessoa.
+  applyAiImprecision(shot, preset, scale = 1) {
+    const gaussian = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
+    const angle = shot.angle + gaussian() * preset.aimError.angle * scale;
+    const velocity = shot.velocity * (1 + (gaussian() * preset.aimError.power * scale) / 100);
 
     return {
-      angle: clamp(shot.angle + angleOffset, -87, 87),
-      velocity: clamp(shot.velocity + velocityOffset, POWER_MIN_VELOCITY, POWER_MAX_VELOCITY),
+      angle: clamp(angle, -87, 87),
+      velocity: clamp(velocity, POWER_MIN_VELOCITY, POWER_MAX_VELOCITY),
       sourceAngle: shot.angle,
       sourceVelocity: shot.velocity,
     };
@@ -952,13 +953,17 @@ export class Game {
     this.aiMissMemory.set(stateKey, misses.slice(-8));
   }
 
+  // Posicoes aproximadas e sem o vento: o empurrao das explosoes e o vento que muda a cada turno
+  // nao devem apagar o que a IA aprendeu sobre aquele alvo.
   buildAiStateKey(attacker, target) {
+    const coarse = (value) => Math.round(value / 12);
     return [
-      Math.round(attacker.position.x),
-      Math.round(attacker.position.y),
-      Math.round(target.position.x),
-      Math.round(target.position.y),
-      this.wind,
+      attacker.id,
+      target.id,
+      coarse(attacker.position.x),
+      coarse(attacker.position.y),
+      coarse(target.position.x),
+      coarse(target.position.y),
       this.aiDifficulty,
     ].join(":");
   }

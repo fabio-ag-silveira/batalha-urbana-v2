@@ -61,6 +61,7 @@ Os carrinhos podem nascer nas ilhas, nos telhados ou nos becos. Cada jogador com
   - **Arsenal:** munição especial em dobro.
 - **Caixas de suprimento:** a partir do 3º turno, caixas podem cair de paraquedas sobre as ilhas, os telhados ou a rua: **vida** (+30 HP), **combustível** (+30) ou **munição** (+1 arma especial). Pega quem encostar o carrinho nela ou acertar um tiro que a atravesse. Explosões perto destroem a caixa.
 - **Câmera dinâmica:** enquadra os dois carrinhos, segue o projétil e mostra o impacto. `C` (ou o botão no menu) alterna para a câmera fixa.
+- **Dificuldade da IA:** as três calculam o tiro certo; o que muda é o "erro humano" no ângulo e na força, quanto do vento a IA considera e o quão rápido ela corrige a mira a cada tiro contra o mesmo alvo. Contra um alvo parado, a IA precisa em média de ~10 tiros no fácil, ~7 no médio e ~5 no difícil, e o difícil erra o primeiro tiro cerca de metade das vezes.
 - **Atalhos:** `B` reinicia, `M` alterna IA/local, `N` muda a dificuldade da IA, `U` liga/desliga o som, `C` troca a câmera.
 
 ### No celular ou tablet

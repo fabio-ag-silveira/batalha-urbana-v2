@@ -31,39 +31,38 @@ export const AI_DIFFICULTIES = {
 export const DEFAULT_GAME_MODE = GAME_MODES.ai;
 export const DEFAULT_AI_DIFFICULTY = AI_DIFFICULTIES.medium;
 export const AI_THINK_DELAY_MS = 700;
+// Todas as dificuldades calculam o tiro certo com a mesma busca; o que muda e o "erro humano":
+// desvio (desvio-padrao) no angulo e na forca, que diminui a cada tiro contra o mesmo alvo
+// (learning) ate um minimo (minError), e quanto a IA considera o vento.
+export const AI_PLANNER = {
+  angleStep: 4,
+  velocityStep: 3,
+  simulationStep: 0.05,
+};
 export const AI_PRESETS = {
   [AI_DIFFICULTIES.easy]: {
     label: "IA fácil",
-    angleStep: 9,
-    velocityStep: 6,
-    simulationStep: 0.08,
-    aimJitter: { angle: 6, velocity: 5 },
-    windKnowledge: 0.3,
+    aimError: { angle: 3, power: 4.5 },
+    learning: 0.72,
+    minError: 0.45,
+    windKnowledge: 0.35,
     specialChance: 0.2,
-    candidatePool: 12,
-    refinement: false,
   },
   [AI_DIFFICULTIES.medium]: {
     label: "IA média",
-    angleStep: 4,
-    velocityStep: 3,
-    simulationStep: 0.06,
-    aimJitter: { angle: 2, velocity: 2 },
-    windKnowledge: 0.75,
+    aimError: { angle: 2.6, power: 4 },
+    learning: 0.6,
+    minError: 0.32,
+    windKnowledge: 0.6,
     specialChance: 0.4,
-    candidatePool: 6,
-    refinement: false,
   },
   [AI_DIFFICULTIES.hard]: {
     label: "IA difícil",
-    angleStep: 3,
-    velocityStep: 2,
-    simulationStep: 0.04,
-    aimJitter: { angle: 0, velocity: 0 },
-    windKnowledge: 1,
+    aimError: { angle: 1.6, power: 2.6 },
+    learning: 0.4,
+    minError: 0.12,
+    windKnowledge: 0.85,
     specialChance: 0.6,
-    candidatePool: 1,
-    refinement: true,
   },
 };
 
