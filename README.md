@@ -11,6 +11,8 @@ npm install      # instala o wrangler (só na primeira vez)
 npm run dev      # servidor local em http://127.0.0.1:8787
 ```
 
+Jogue em <https://batalha2d.fabiosilveira.dev>. O endereço antigo, `batalha.fabiosilveira.dev`, redireciona para ele (Redirect Rule 301 da Cloudflare, mantendo o caminho e os parâmetros).
+
 ## Publicar no Cloudflare Workers
 
 ```powershell

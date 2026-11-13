@@ -9,6 +9,6 @@
   },
   // O deploy cria o registro DNS e o certificado do subdominio automaticamente.
   "routes": [
-    { "pattern": "batalha.fabiosilveira.dev", "custom_domain": true }
+    { "pattern": "batalha2d.fabiosilveira.dev", "custom_domain": true }
   ]
 }
